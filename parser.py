@@ -59,7 +59,7 @@ def p_transitions_2(p):
 
 def p_transition(p):
     '''transition : VARIABLE ASSIGN expr SEMI'''
-    p[0] = {p[1]: p[3]}
+    p[0] = {sp.Symbol(p[1]): p[3]}
 
 def p_expr_1(p):
     '''expr : factor PLUS expr'''
@@ -103,4 +103,4 @@ if __name__ == '__main__':
         recurrence = parser.parse(fp.read())
         x = sp.Symbol('x')
         y = sp.Symbol('y')
-        print(recurrence.get_index_seq({x: 5, y: 0}, 10))
+        recurrence.solve_periodic([0, 1])

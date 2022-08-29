@@ -1,9 +1,13 @@
 from functools import reduce
+import re
 from webbrowser import BackgroundBrowser
 import sympy as sp
 from sympy.logic.boolalg import Boolean
 
 class Recurrence:
+
+    inductive_var = sp.Symbol('_n', Integer=True)
+
     def __init__(self, conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]]):
         self.conditions = conditions
         self.transitions = transitions
@@ -46,15 +50,52 @@ class Recurrence:
 
     def solve_periodic(self, periodic_seg: list[int]):
         linearized_transitions = Recurrence.to_linear(self.transitions)
+        periodic_transition = {var: var for var in self.variables}
+        for i in periodic_seg:
+            cur_transition = linearized_transitions[i]
+            periodic_transition = Recurrence.symbolic_transition(periodic_transition, cur_transition)
+        periodic_closed_form = Recurrence.solve_linear_rec(periodic_transition)
+        mod_closed_form = [periodic_closed_form]
+        for i in periodic_seg[:-1]:
+            cur_transition = linearized_transitions[i]
+            cur_value = mod_closed_form[-1]
+            mod_closed_form.append(Recurrence.symbolic_transition(cur_value, cur_transition))
+        for i in range(len(mod_closed_form)):
+            mod_closed_form[i] = {v: mod_closed_form[i][v].subs({Recurrence.inductive_var: (Recurrence.inductive_var - i)/len(periodic_seg)}) for v in mod_closed_form[i]}
+        print(mod_closed_form)
+
+    @staticmethod
+    def symbolic_transition(cur_value: dict[sp.Symbol, sp.Expr], transition: dict[sp.Symbol, sp.Expr]):
+        return {var: transition.setdefault(var, var).subs(cur_value) for var in cur_value}
 
     @staticmethod
     def solve_linear_rec(linear_transition: dict[sp.Symbol, sp.Expr]):
-        matrix_form = Recurrence.linear2matrix(linear_transition)
+        ordered_vars, matrix_form = Recurrence.linear2matrix(linear_transition)
+        matrix_closed_form = sp.MatPow(matrix_form, Recurrence.inductive_var, evaluate=True)
+        assert(not isinstance(matrix_closed_form, sp.MatPow))
+        return Recurrence.matrix2linear(ordered_vars, matrix_closed_form)
 
     @staticmethod
-    def to_linear(transitions):
-        pass
+    def to_linear(transitions: list[dict[sp.Symbol, sp.Expr]]):
+        return transitions
 
     @staticmethod
-    def linear2matrix(linear_transition: dict[sp.Symbol, sp.Expr]) -> sp.Matrix:
-        pass
+    def matrix2linear(ordered_vars: list[sp.Symbol], matrix: sp.Matrix):
+        res = {}
+        for i, v1 in enumerate(ordered_vars):
+            res |= {v1: sum([matrix[i, j]*v2 for j, v2 in enumerate(ordered_vars)]) + matrix[i, -1]}
+        return res
+
+    @staticmethod
+    def linear2matrix(linear_transition: dict[sp.Symbol, sp.Expr]) -> tuple[list[sp.Symbol], sp.Matrix]:
+        ordered_vars = list(linear_transition.keys())
+        dim = len(ordered_vars)
+        res = sp.eye(dim + 1)
+        for i, v1 in enumerate(ordered_vars):
+            const_term = linear_transition[v1].subs({v: sp.Integer(0) for v in ordered_vars})
+            res[i, dim] = const_term
+            for j, v2 in enumerate(ordered_vars):
+                mask_dict = {v: sp.Integer(0) for v in ordered_vars} | {v2: sp.Integer(1)}
+                res[i, j] = linear_transition[v1].subs(mask_dict) - const_term
+        return ordered_vars, res
+
