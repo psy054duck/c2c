@@ -91,7 +91,7 @@ def p_operand_1(p):
 
 def p_operand_2(p):
     '''operand : NUMBER'''
-    p[0] = p[1]
+    p[0] = sp.Integer(p[1])
 
 def p_error(p):
     print(p)
