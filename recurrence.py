@@ -10,6 +10,9 @@ class Recurrence:
 
     def __init__(self, conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]]):
         self.conditions = conditions
+        self.conditions = [conditions[0]]
+        for i, cond in enumerate(conditions[1:]):
+            self.conditions.append(sp.And(sp.Not(self.conditions[-1]), cond))
         self.transitions = transitions
         self.variables = reduce(set.union, [set(t.keys()) for t in transitions])
 
@@ -31,22 +34,39 @@ class Recurrence:
         return cur
 
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
-        l = 2
+        l = 10
         BOUND = 1000
         cur_inits = inits
         while l < BOUND:
-            index_seq = self.get_index_seqs(cur_inits, l)
+            l *= 2
+            index_seq, values = self.get_index_seq(cur_inits, l)
+            threshold, periodic_seg = generate_periodic_seg(index_seq)
+            assert(threshold == 0) # temperally 
+            non_periodic_closed_form = None
+            if threshold != 0:
+                non_periodic_closed_form = self.solve_periodic(index_seq[:threshold])
+            periodic_closed_form = self.solve_periodic(periodic_seg)
+            periodic_closed_form = [{v: closed_form[v].subs(values[threshold]) for v in closed_form} for closed_form in periodic_closed_form]
+            self.validate(periodic_closed_form, periodic_seg)
+            break
+
+    def validate(self, closed_form: list[dict[sp.Symbol, sp.Expr]], periodic_seg: list[int]):
+        for cond in self.conditions:
+
+
 
     def get_index_seq(self, inits: dict[sp.Symbol, sp.Integer | int], l):
         index_seq = []
         cur = {k: sp.Integer(inits[k]) for k in inits}
+        values = [cur]
         for _ in range(l):
             for i, (cond, tran) in enumerate(zip(self.conditions, self.transitions)):
                 if cond.subs(cur) == sp.S.true:
                     index_seq.append(i)
-                    cur = {var: tran.setdefault(var, var).subs(cur) for var in tran}
+                    cur |= {var: tran.setdefault(var, var).subs(cur) for var in tran}
+                    values.append(cur)
                     break
-        return index_seq
+        return index_seq, values
 
     def solve_periodic(self, periodic_seg: list[int]):
         linearized_transitions = Recurrence.to_linear(self.transitions)
@@ -62,7 +82,7 @@ class Recurrence:
             mod_closed_form.append(Recurrence.symbolic_transition(cur_value, cur_transition))
         for i in range(len(mod_closed_form)):
             mod_closed_form[i] = {v: mod_closed_form[i][v].subs({Recurrence.inductive_var: (Recurrence.inductive_var - i)/len(periodic_seg)}) for v in mod_closed_form[i]}
-        print(mod_closed_form)
+        return mod_closed_form
 
     @staticmethod
     def symbolic_transition(cur_value: dict[sp.Symbol, sp.Expr], transition: dict[sp.Symbol, sp.Expr]):
@@ -99,3 +119,21 @@ class Recurrence:
                 res[i, j] = linear_transition[v1].subs(mask_dict) - const_term
         return ordered_vars, res
 
+def generate_periodic_seg(index_seq):
+    best_periodic_seg = []
+    best_threshold = 0
+    reversed_index_seq = list(reversed(index_seq))
+    for i in range(1, len(index_seq)//2 + 1):
+        candidate = reversed_index_seq[:i]
+        for j in range(len(reversed_index_seq)):
+            if candidate[j % i] != reversed_index_seq[j]:
+                if j >= 2*i and j > best_threshold:
+                    best_periodic_seg = reversed_index_seq[j - i:j]
+                    best_threshold = j
+                break
+        else:
+            return 0, reversed_index_seq[j - i:j]
+    return len(index_seq) - best_threshold, list(reversed(best_periodic_seg))
+
+if __name__ == '__main__':
+    print(generate_periodic_seg([1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]))

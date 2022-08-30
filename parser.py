@@ -103,4 +103,5 @@ if __name__ == '__main__':
         recurrence = parser.parse(fp.read())
         x = sp.Symbol('x')
         y = sp.Symbol('y')
-        recurrence.solve_periodic([0, 1])
+        # recurrence.solve_periodic([0, 1])
+        recurrence.solve_with_inits({x: sp.Integer(0), y: sp.Integer(0)})
