@@ -1,4 +1,6 @@
+from cgitb import small
 from functools import reduce
+from operator import index
 import re
 from webbrowser import BackgroundBrowser
 import sympy as sp
@@ -37,23 +39,57 @@ class Recurrence:
         l = 10
         BOUND = 1000
         cur_inits = inits
+        res = []
+        smallest = 0
         while l < BOUND:
             l *= 2
             index_seq, values = self.get_index_seq(cur_inits, l)
             threshold, periodic_seg = generate_periodic_seg(index_seq)
-            assert(threshold == 0) # temperally 
+            # assert(threshold == 0) # temperally 
             non_periodic_closed_form = None
             if threshold != 0:
-                non_periodic_closed_form = self.solve_periodic(index_seq[:threshold])
+                if all([s == index_seq[0] for s in index_seq[:threshold]]):
+                    non_periodic_closed_form = self.solve_periodic(index_seq[:1])
+                else:
+                    non_periodic_closed_form = self.solve_periodic(index_seq[:threshold])
+                non_periodic_closed_form = [{v: closed_form[v].subs(values[0]) for v in closed_form} for closed_form in non_periodic_closed_form]
+                res.append((Recurrence.inductive_var < threshold + smallest, non_periodic_closed_form))
             periodic_closed_form = self.solve_periodic(periodic_seg)
-            periodic_closed_form = [{v: closed_form[v].subs(values[threshold]) for v in closed_form} for closed_form in periodic_closed_form]
-            self.validate(periodic_closed_form, periodic_seg)
-            break
+            periodic_closed_form = [{v: closed_form[v].subs(values[threshold] | {Recurrence.inductive_var: Recurrence.inductive_var - threshold}) for v in closed_form} for closed_form in periodic_closed_form]
+            cur_smallest = self.validate(periodic_closed_form, periodic_seg)
+            if cur_smallest == -1:
+                return res + [(sp.S.true, periodic_closed_form)]
+            else:
+                res += [(Recurrence.inductive_var < smallest + cur_smallest, periodic_closed_form)]
+            cur_inits = self.kth_values(values[smallest])
 
     def validate(self, closed_form: list[dict[sp.Symbol, sp.Expr]], periodic_seg: list[int]):
-        for cond in self.conditions:
+        smallest = []
+        for i, cond in enumerate(self.conditions):
+            for j, p in enumerate(periodic_seg):
+                to_validate = cond.subs(Recurrence._transform_closed_form(closed_form[j], {Recurrence.inductive_var: len(periodic_seg)*Recurrence.inductive_var + j}))
+                to_validate = sp.simplify(to_validate)
+                # to_validate = cond.subs(closed_form[j].subs({Recurrence.inductive_var: Recurrence.inductive_var + j}).subs({Recurrence.inductive_var: len(periodic_seg)*Recurrence.inductive_var}))
+                if to_validate != sp.S.true and to_validate != sp.S.false:
+                    raise Exception('fail to simplify the validation condition %s' % to_validate)
+                if (i == p and to_validate != sp.S.true):
+                    interval = to_validate.as_set().intersect(sp.S.Naturals)
+                    if not interval.is_superset(sp.S.Naturals):
+                        if interval.boundary.contains(0):
+                            min_v = min(interval.boundary - {sp.Integer(0)})
+                        else:
+                            min_v = sp.Integer(0)
+                        smallest.append(min_v*len(periodic_seg) + j)
+                elif (i != p and to_validate != sp.S.false):
+                    interval = to_validate.as_set().intersect(sp.S.Naturals)
+                    if not interval.is_empty:
+                        min_v = min(interval.boundary)
+                        smallest.append(min_v*len(periodic_seg) + j)
+        return min(smallest, default=-1)
 
-
+    @staticmethod
+    def _transform_closed_form(closed_form, pairs):
+        return {k: closed_form[k].subs(pairs) for k in closed_form}
 
     def get_index_seq(self, inits: dict[sp.Symbol, sp.Integer | int], l):
         index_seq = []
@@ -63,7 +99,7 @@ class Recurrence:
             for i, (cond, tran) in enumerate(zip(self.conditions, self.transitions)):
                 if cond.subs(cur) == sp.S.true:
                     index_seq.append(i)
-                    cur |= {var: tran.setdefault(var, var).subs(cur) for var in tran}
+                    cur = cur | {var: tran.setdefault(var, var).subs(cur) for var in tran}
                     values.append(cur)
                     break
         return index_seq, values

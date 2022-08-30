@@ -104,4 +104,5 @@ if __name__ == '__main__':
         x = sp.Symbol('x')
         y = sp.Symbol('y')
         # recurrence.solve_periodic([0, 1])
-        recurrence.solve_with_inits({x: sp.Integer(0), y: sp.Integer(0)})
+        res = recurrence.solve_with_inits({x: sp.Integer(-10), y: sp.Integer(0)})
+        print(res)
