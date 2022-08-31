@@ -1,10 +1,9 @@
 from cgitb import small
 from functools import reduce
-from operator import index
 import re
-from webbrowser import BackgroundBrowser
 import sympy as sp
 from sympy.logic.boolalg import Boolean
+import random
 
 class Recurrence:
 
@@ -35,55 +34,83 @@ class Recurrence:
                     break
         return cur
 
+    def solve(self):
+        cur_initals = {var: sp.Integer(random.randint(0, 10)) for var in self.variables}
+        _, index_seq = self.solve_with_inits(cur_initals)
+        print(index_seq)
+
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
         BOUND = 1000
         cur_inits = inits
         res = []
         smallest = 0
+        res_index_seq = []
         while l < BOUND:
             l *= 2
             index_seq, values = self.get_index_seq(cur_inits, l)
             threshold, periodic_seg = generate_periodic_seg(index_seq)
-            # assert(threshold == 0) # temperally 
             non_periodic_closed_form = None
-            if threshold != 0:
-                if all([s == index_seq[0] for s in index_seq[:threshold]]):
-                    non_periodic_closed_form = self.solve_periodic(index_seq[:1])
+            cur_threshold = threshold
+
+            non_periodic_res_index = []
+            non_periodic_res = []
+            prev_threshold = threshold
+            while cur_threshold != 0:
+                cur_threshold, cur_periodic_seg = generate_periodic_seg(index_seq[:prev_threshold])
+                if len(cur_periodic_seg) == 0:
+                    non_periodic_res_index = [index_seq[:cur_threshold]] + non_periodic_res_index
+                    cur_closed_form = self.solve_periodic(index_seq[:cur_threshold])
                 else:
-                    non_periodic_closed_form = self.solve_periodic(index_seq[:threshold])
-                non_periodic_closed_form = [{v: closed_form[v].subs(values[0]) for v in closed_form} for closed_form in non_periodic_closed_form]
-                res.append((Recurrence.inductive_var < threshold + smallest, non_periodic_closed_form))
+                    non_periodic_res_index.append(cur_periodic_seg)
+                    cur_closed_form = self.solve_periodic(cur_periodic_seg)
+                if len(cur_periodic_seg) == 0:
+                    cur_closed_form = [{v: closed_form[v].subs(values[0]) for v in closed_form} for closed_form in cur_closed_form]
+                    non_periodic_res = [(Recurrence.inductive_var < cur_threshold + smallest, cur_closed_form)] + non_periodic_res
+                    break
+                else:
+                    cur_closed_form = [{v: closed_form[v].subs(values[cur_threshold]) for v in closed_form} for closed_form in cur_closed_form]
+                    non_periodic_res.append((Recurrence.inductive_var < smallest + threshold, cur_closed_form))
+                # res.append((Recurrence.inductive_var < threshold + smallest, non_periodic_closed_form))
+                prev_threshold = cur_threshold
+            res += non_periodic_res
+            res_index_seq.extend(non_periodic_res_index)
             periodic_closed_form = self.solve_periodic(periodic_seg)
             periodic_closed_form = [{v: closed_form[v].subs(values[threshold] | {Recurrence.inductive_var: Recurrence.inductive_var - threshold}) for v in closed_form} for closed_form in periodic_closed_form]
             cur_smallest = self.validate(periodic_closed_form, periodic_seg)
+            res_index_seq.append(periodic_seg)
             if cur_smallest == -1:
-                return res + [(sp.S.true, periodic_closed_form)]
+                return res + [(sp.S.true, periodic_closed_form)], res_index_seq
             else:
                 res += [(Recurrence.inductive_var < smallest + cur_smallest, periodic_closed_form)]
-            cur_inits = self.kth_values(values[smallest])
+            cur_inits = self.kth_values(values[smallest], cur_smallest)
+            smallest = smallest + cur_smallest
 
     def validate(self, closed_form: list[dict[sp.Symbol, sp.Expr]], periodic_seg: list[int]):
         smallest = []
+        non_neg_interval = sp.Interval(0, sp.oo)
         for i, cond in enumerate(self.conditions):
             for j, p in enumerate(periodic_seg):
                 to_validate = cond.subs(Recurrence._transform_closed_form(closed_form[j], {Recurrence.inductive_var: len(periodic_seg)*Recurrence.inductive_var + j}))
                 to_validate = sp.simplify(to_validate)
                 # to_validate = cond.subs(closed_form[j].subs({Recurrence.inductive_var: Recurrence.inductive_var + j}).subs({Recurrence.inductive_var: len(periodic_seg)*Recurrence.inductive_var}))
-                if to_validate != sp.S.true and to_validate != sp.S.false:
-                    raise Exception('fail to simplify the validation condition %s' % to_validate)
+                # if to_validate != sp.S.true and to_validate != sp.S.false:
+                #     raise Exception('fail to simplify the validation condition %s' % to_validate)
                 if (i == p and to_validate != sp.S.true):
-                    interval = to_validate.as_set().intersect(sp.S.Naturals)
-                    if not interval.is_superset(sp.S.Naturals):
+                    interval = to_validate.as_set().intersect(non_neg_interval)
+                    if not interval.is_superset(non_neg_interval):
                         if interval.boundary.contains(0):
-                            min_v = min(interval.boundary - {sp.Integer(0)})
+                            int_in_boundary = {sp.floor(v) for v in interval.boundary if interval.contains(v)}
+                            min_v = min(int_in_boundary - {sp.Integer(0)})
                         else:
                             min_v = sp.Integer(0)
                         smallest.append(min_v*len(periodic_seg) + j)
                 elif (i != p and to_validate != sp.S.false):
-                    interval = to_validate.as_set().intersect(sp.S.Naturals)
+                    interval = to_validate.as_set().intersect(non_neg_interval)
                     if not interval.is_empty:
-                        min_v = min(interval.boundary)
+                        min_v = sp.ceiling(interval.inf)
+                        if not interval.contains(min_v):
+                            min_v += 1
                         smallest.append(min_v*len(periodic_seg) + j)
         return min(smallest, default=-1)
 
