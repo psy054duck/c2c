@@ -4,6 +4,7 @@ import re
 import sympy as sp
 from sympy.logic.boolalg import Boolean
 import random
+import z3
 
 class Recurrence:
 
@@ -35,9 +36,10 @@ class Recurrence:
         return cur
 
     def solve(self):
-        cur_initals = {var: sp.Integer(random.randint(0, 10)) for var in self.variables}
+        cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
         _, index_seq = self.solve_with_inits(cur_initals)
-        print(index_seq)
+        ks = [z3.Int('_k%d' % i) for i in range(len(cur_initals) - 1)]
+
 
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
