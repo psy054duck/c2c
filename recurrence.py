@@ -43,7 +43,7 @@ class Recurrence:
     def solve(self):
         cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
         _, index_seq = self.solve_with_inits(cur_initals)
-        ks = [z3.Int('_k%d' % i) for i in range(len(cur_initals) - 1)]
+        ks = [sp.Symbol('_k%d' % i, Integer=True) for i in range(len(index_seq) - 1)]
         closed_forms = []
         prev_closed_form = None
         prev_k = None
@@ -62,7 +62,9 @@ class Recurrence:
             init_values = {var: prev_closed_form[var].subs(Recurrence.inductive_var, prev_k) for var in prev_closed_form}
             cur_closed_form = {var: cur_closed_form[var].subs(init_values) for var in cur_closed_form}
         closed_forms.append(cur_closed_form)
-        print(closed_forms)
+        for closed in closed_forms:
+            for var in closed:
+                print(to_z3(closed[var]))
 
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
@@ -75,7 +77,6 @@ class Recurrence:
             l *= 2
             index_seq, values = self.get_index_seq(cur_inits, l)
             threshold, periodic_seg = generate_periodic_seg(index_seq)
-            non_periodic_closed_form = None
             cur_threshold = threshold
 
             non_periodic_res_index = []
@@ -118,9 +119,6 @@ class Recurrence:
             for j, p in enumerate(periodic_seg):
                 to_validate = cond.subs(Recurrence._transform_closed_form(closed_form[j], {Recurrence.inductive_var: len(periodic_seg)*Recurrence.inductive_var + j}))
                 to_validate = sp.simplify(to_validate)
-                # to_validate = cond.subs(closed_form[j].subs({Recurrence.inductive_var: Recurrence.inductive_var + j}).subs({Recurrence.inductive_var: len(periodic_seg)*Recurrence.inductive_var}))
-                # if to_validate != sp.S.true and to_validate != sp.S.false:
-                #     raise Exception('fail to simplify the validation condition %s' % to_validate)
                 if (i == p and to_validate != sp.S.true):
                     interval = to_validate.as_set().intersect(non_neg_interval)
                     if not interval.is_superset(non_neg_interval):
@@ -174,6 +172,8 @@ class Recurrence:
 
     def periodic_closed_form2sympy(self, closed_form: list[dict[sp.Symbol, sp.Expr]]):
         res = {}
+        if len(closed_form) == 1:
+            return closed_form[0]
         for var in self.variables:
             res[var] = sp.Piecewise(*[(closed[var], sp.Eq(Recurrence.inductive_var % len(closed_form), i)) for i, closed in enumerate(closed_form)])
         return res
@@ -229,8 +229,8 @@ def generate_periodic_seg(index_seq):
             return 0, reversed_index_seq[j - i:j]
     return len(index_seq) - best_threshold, list(reversed(best_periodic_seg))
 
-def to_z3(self):
-    print(type(self))
+def to_z3(sp_expr):
+    self = sp.factor(sp_expr)
     if isinstance(self, sp.Add):
         return sum([to_z3(arg) for arg in self.args])
     elif isinstance(self, sp.Mul):
@@ -254,14 +254,20 @@ def to_z3(self):
         return to_z3(self.lhs) <= to_z3(self.rhs)
     elif isinstance(self, sp.Eq):
         return to_z3(self.lhs) == to_z3(self.rhs)
-    elif isinstance(self, sp.Integer):
-        return int(self)
+    elif isinstance(self, sp.Integer) or isinstance(self, int):
+        return z3.IntVal(int(self))
     elif isinstance(self, sp.Symbol):
         return z3.Int(str(self))
+    elif isinstance(self, sp.Rational):
+        return z3.RatVal(self.numerator, self.denominator)
+    elif isinstance(self, sp.Mod):
+        return to_z3(self.args[0]) % to_z3(self.args[1])
+    else:
+        raise Exception('Conversion for "%s" has not been implemented yet' % type(self))
 
 if __name__ == '__main__':
     # print(generate_periodic_seg([1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]))
     a = sp.Symbol('a')
     k = sp.Symbol('k')
-    e = a + 1 - sp.Piecewise((a + 1, k > 10), (a + 100, k <= 10))
-    print(to_z3(e))
+    e = a + 1 - sp.Piecewise((a/2 + 1, sp.Eq(k % 10, 1)), (a + 100, sp.Eq(k % 10, 0)))
+    print(z3.simplify(to_z3(e)))
