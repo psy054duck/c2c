@@ -1,10 +1,15 @@
-from cgitb import small
+from configparser import InterpolationSyntaxError
+from fileinput import close
 from functools import reduce
+from itertools import product
 import re
+from readline import insert_text
 import sympy as sp
 from sympy.logic.boolalg import Boolean
 import random
 import z3
+
+from closed_form import Closed_form
 
 class Recurrence:
 
@@ -39,7 +44,25 @@ class Recurrence:
         cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
         _, index_seq = self.solve_with_inits(cur_initals)
         ks = [z3.Int('_k%d' % i) for i in range(len(cur_initals) - 1)]
-
+        closed_forms = []
+        prev_closed_form = None
+        prev_k = None
+        for seq, k in zip(index_seq, ks):
+            cur_closed_form = self.solve_periodic(seq)
+            cur_closed_form = self.periodic_closed_form2sympy(cur_closed_form)
+            if prev_closed_form is not None:
+                init_values = {var: prev_closed_form[var].subs(Recurrence.inductive_var, prev_k) for var in prev_closed_form}
+                cur_closed_form = {var: cur_closed_form[var].subs(init_values) for var in cur_closed_form}
+            prev_closed_form = cur_closed_form
+            prev_k = k
+            closed_forms.append(cur_closed_form)
+        cur_closed_form = self.solve_periodic(index_seq[-1])
+        cur_closed_form = self.periodic_closed_form2sympy(cur_closed_form)
+        if prev_closed_form is not None:
+            init_values = {var: prev_closed_form[var].subs(Recurrence.inductive_var, prev_k) for var in prev_closed_form}
+            cur_closed_form = {var: cur_closed_form[var].subs(init_values) for var in cur_closed_form}
+        closed_forms.append(cur_closed_form)
+        print(closed_forms)
 
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
@@ -149,6 +172,12 @@ class Recurrence:
             mod_closed_form[i] = {v: mod_closed_form[i][v].subs({Recurrence.inductive_var: (Recurrence.inductive_var - i)/len(periodic_seg)}) for v in mod_closed_form[i]}
         return mod_closed_form
 
+    def periodic_closed_form2sympy(self, closed_form: list[dict[sp.Symbol, sp.Expr]]):
+        res = {}
+        for var in self.variables:
+            res[var] = sp.Piecewise(*[(closed[var], sp.Eq(Recurrence.inductive_var % len(closed_form), i)) for i, closed in enumerate(closed_form)])
+        return res
+
     @staticmethod
     def symbolic_transition(cur_value: dict[sp.Symbol, sp.Expr], transition: dict[sp.Symbol, sp.Expr]):
         return {var: transition.setdefault(var, var).subs(cur_value) for var in cur_value}
@@ -200,5 +229,39 @@ def generate_periodic_seg(index_seq):
             return 0, reversed_index_seq[j - i:j]
     return len(index_seq) - best_threshold, list(reversed(best_periodic_seg))
 
+def to_z3(self):
+    print(type(self))
+    if isinstance(self, sp.Add):
+        return sum([to_z3(arg) for arg in self.args])
+    elif isinstance(self, sp.Mul):
+        return reduce(lambda x, y: x*y, [to_z3(arg) for arg in self.args])
+    elif isinstance(self, sp.Piecewise):
+        cond  = to_z3(self.args[0][1])
+        return z3.If(cond, to_z3(self.args[0][0]), to_z3(self.args[1][0]))
+    elif isinstance(self, sp.And):
+        return z3.And(*[to_z3(arg) for arg in self.args])
+    elif isinstance(self, sp.Or):
+        return z3.Or(*[to_z3(arg) for arg in self.args])
+    elif isinstance(self, sp.Not):
+        return z3.Not(*[to_z3(arg) for arg in self.args])
+    elif isinstance(self, sp.Gt):
+        return to_z3(self.lhs) > to_z3(self.rhs)
+    elif isinstance(self, sp.Ge):
+        return to_z3(self.lhs) >= to_z3(self.rhs)
+    elif isinstance(self, sp.Lt):
+        return to_z3(self.lhs) < to_z3(self.rhs)
+    elif isinstance(self, sp.Le):
+        return to_z3(self.lhs) <= to_z3(self.rhs)
+    elif isinstance(self, sp.Eq):
+        return to_z3(self.lhs) == to_z3(self.rhs)
+    elif isinstance(self, sp.Integer):
+        return int(self)
+    elif isinstance(self, sp.Symbol):
+        return z3.Int(str(self))
+
 if __name__ == '__main__':
-    print(generate_periodic_seg([1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]))
+    # print(generate_periodic_seg([1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]))
+    a = sp.Symbol('a')
+    k = sp.Symbol('k')
+    e = a + 1 - sp.Piecewise((a + 1, k > 10), (a + 100, k <= 10))
+    print(to_z3(e))
