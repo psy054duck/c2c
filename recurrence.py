@@ -52,7 +52,7 @@ class Recurrence:
             cur_closed_form = self.periodic_closed_form2sympy(cur_closed_form)
             if prev_closed_form is not None:
                 init_values = {var: prev_closed_form[var].subs(Recurrence.inductive_var, prev_k) for var in prev_closed_form}
-                cur_closed_form = {var: cur_closed_form[var].subs(init_values) for var in cur_closed_form}
+                cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(Recurrence.inductive_var, Recurrence.inductive_var - prev_k) for var in cur_closed_form}
             prev_closed_form = cur_closed_form
             prev_k = k
             closed_forms.append(cur_closed_form)
@@ -60,11 +60,21 @@ class Recurrence:
         cur_closed_form = self.periodic_closed_form2sympy(cur_closed_form)
         if prev_closed_form is not None:
             init_values = {var: prev_closed_form[var].subs(Recurrence.inductive_var, prev_k) for var in prev_closed_form}
-            cur_closed_form = {var: cur_closed_form[var].subs(init_values) for var in cur_closed_form}
+            cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(Recurrence.inductive_var, Recurrence.inductive_var - prev_k) for var in cur_closed_form}
         closed_forms.append(cur_closed_form)
-        for closed in closed_forms:
-            for var in closed:
-                print(to_z3(closed[var]))
+        z3_solver = z3.Solver()
+        z3_ind_var = z3.Int(str(Recurrence.inductive_var))
+        for i, k in enumerate(ks):
+            cur_closed_form = closed_forms[i]
+            try:
+                prev_k = ks[i-1]
+            except:
+                prev_k = 0
+            seq = index_seq[i]
+            for s in seq:
+                z3_solver.add(z3.ForAll(z3_ind_var, z3.Implies(z3.And(prev_k <= z3_ind_var, z3_ind_var < k),
+                                                               self.conditions[s])))
+
 
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
