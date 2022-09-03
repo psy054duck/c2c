@@ -1,19 +1,19 @@
 from configparser import InterpolationSyntaxError
 from fileinput import close
 from functools import reduce
+from http.client import InvalidURL
 from itertools import product
 import re
 from readline import insert_text
+from socket import IPV6_USE_MIN_MTU
 import sympy as sp
 from sympy.logic.boolalg import Boolean
 import random
 import z3
 
-from closed_form import Closed_form
-
 class Recurrence:
 
-    inductive_var = sp.Symbol('_n', Integer=True)
+    inductive_var = sp.Symbol('_n', integer=True)
 
     def __init__(self, conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]]):
         self.conditions = conditions
@@ -43,7 +43,8 @@ class Recurrence:
     def solve(self):
         cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
         _, index_seq = self.solve_with_inits(cur_initals)
-        ks = [sp.Symbol('_k%d' % i, Integer=True) for i in range(len(index_seq) - 1)]
+        print(index_seq)
+        ks = [sp.Symbol('_k%d' % i, integer=True) for i in range(len(index_seq) - 1)]
         closed_forms = []
         prev_closed_form = None
         prev_k = None
@@ -62,19 +63,41 @@ class Recurrence:
             init_values = {var: prev_closed_form[var].subs(Recurrence.inductive_var, prev_k) for var in prev_closed_form}
             cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(Recurrence.inductive_var, Recurrence.inductive_var - prev_k) for var in cur_closed_form}
         closed_forms.append(cur_closed_form)
-        z3_solver = z3.Solver()
+        z3_qe = z3.Then('qe', 'ctx-solver-simplify', 'ctx-simplify')
+        # z3_qe = z3.Tactic('qe')
         z3_ind_var = z3.Int(str(Recurrence.inductive_var))
-        for i, k in enumerate(ks):
+        validation_conditions = True
+        z3_ks = [to_z3(k) for k in ks]
+        for i, k in enumerate(z3_ks):
             cur_closed_form = closed_forms[i]
-            try:
-                prev_k = ks[i-1]
-            except:
+            if i > 0:
+                prev_k = z3_ks[i-1]
+            else:
                 prev_k = 0
             seq = index_seq[i]
-            for s in seq:
-                z3_solver.add(z3.ForAll(z3_ind_var, z3.Implies(z3.And(prev_k <= z3_ind_var, z3_ind_var < k),
-                                                               self.conditions[s])))
-
+            for j, s in enumerate(seq):
+                shifted_ind_var = len(seq)*z3_ind_var + j
+                shifted_closed_form = {to_z3(var): z3.substitute(to_z3(cur_closed_form[var]), (z3_ind_var, shifted_ind_var)) for var in cur_closed_form}
+                validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
+                validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(prev_k <= shifted_ind_var, shifted_ind_var< k), validation_cond))
+                validation_conditions = z3.And(validation_conditions, validation_cond, k >= 1)
+                # print(validation_cond, k >= 1)
+        # print(validation_conditions)
+        prev_k = z3_ks[-1] if len(z3_ks) > 0 else 0
+        cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(Recurrence.inductive_var, Recurrence.inductive_var + sp.Symbol(str(prev_k), integer=True))) for var in closed_forms[-1]}
+        seq = index_seq[-1]
+        for j, s in enumerate(seq):
+            shifted_ind_var = len(seq)*Recurrence.inductive_var + j
+            shifted_closed_form = {to_z3(var): to_z3(sp.simplify(cur_closed_form[var].subs(Recurrence.inductive_var, shifted_ind_var))) for var in cur_closed_form}
+            validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
+            validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(prev_k <= to_z3(shifted_ind_var)), validation_cond))
+            validation_conditions = z3.And(validation_conditions, validation_cond)
+        sim = z3.Tactic('simplify')
+        print(z3_qe(z3.simplify(validation_conditions)))
+        # y - x - 2k >= -1
+        # x - y + 2k <= 1
+        # 2k <= 1 + y - x
+        # k <= (1 + y - x) / 2
 
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
@@ -242,38 +265,56 @@ def generate_periodic_seg(index_seq):
 def to_z3(sp_expr):
     self = sp.factor(sp_expr)
     if isinstance(self, sp.Add):
-        return sum([to_z3(arg) for arg in self.args])
+        res = sum([to_z3(arg) for arg in self.args])
     elif isinstance(self, sp.Mul):
-        return reduce(lambda x, y: x*y, [to_z3(arg) for arg in self.args])
+        res = 1
+        for arg in reversed(self.args):
+            if arg.is_number and not arg.is_Integer:
+                res = (res*arg.numerator)/arg.denominator
+            else:
+                res = res * to_z3(arg)
+        return z3.simplify(res)
+        # return reduce(lambda x, y: x*y, [to_z3(arg) for arg in reversed(self.args)])
     elif isinstance(self, sp.Piecewise):
         cond  = to_z3(self.args[0][1])
-        return z3.If(cond, to_z3(self.args[0][0]), to_z3(self.args[1][0]))
+        res = z3.If(cond, to_z3(self.args[0][0]), to_z3(self.args[1][0]))
     elif isinstance(self, sp.And):
-        return z3.And(*[to_z3(arg) for arg in self.args])
+        res = z3.And(*[to_z3(arg) for arg in self.args])
     elif isinstance(self, sp.Or):
-        return z3.Or(*[to_z3(arg) for arg in self.args])
+        res = z3.Or(*[to_z3(arg) for arg in self.args])
     elif isinstance(self, sp.Not):
-        return z3.Not(*[to_z3(arg) for arg in self.args])
+        res = z3.Not(*[to_z3(arg) for arg in self.args])
     elif isinstance(self, sp.Gt):
-        return to_z3(self.lhs) > to_z3(self.rhs)
+        res = to_z3(self.lhs) > to_z3(self.rhs)
     elif isinstance(self, sp.Ge):
-        return to_z3(self.lhs) >= to_z3(self.rhs)
+        res = to_z3(self.lhs) >= to_z3(self.rhs)
     elif isinstance(self, sp.Lt):
-        return to_z3(self.lhs) < to_z3(self.rhs)
+        res = to_z3(self.lhs) < to_z3(self.rhs)
     elif isinstance(self, sp.Le):
-        return to_z3(self.lhs) <= to_z3(self.rhs)
+        res = to_z3(self.lhs) <= to_z3(self.rhs)
     elif isinstance(self, sp.Eq):
-        return to_z3(self.lhs) == to_z3(self.rhs)
+        res = to_z3(self.lhs) == to_z3(self.rhs)
     elif isinstance(self, sp.Integer) or isinstance(self, int):
-        return z3.IntVal(int(self))
+        res = z3.IntVal(int(self))
     elif isinstance(self, sp.Symbol):
-        return z3.Int(str(self))
+        res = z3.Int(str(self))
     elif isinstance(self, sp.Rational):
-        return z3.RatVal(self.numerator, self.denominator)
+        # return z3.RatVal(self.numerator, self.denominator)
+        res = z3.IntVal(self.numerator) / z3.IntVal(self.denominator)
     elif isinstance(self, sp.Mod):
-        return to_z3(self.args[0]) % to_z3(self.args[1])
+        res = to_z3(self.args[0]) % to_z3(self.args[1])
     else:
         raise Exception('Conversion for "%s" has not been implemented yet' % type(self))
+    return z3.simplify(res)
+
+def my_simplify_sp(expr):
+    return sp.simplify(expr)
+    if isinstance(expr, sp.Piecewise):
+        new_args = [(sp.simplify(e), sp.simplify(c)) for e, c in expr.args]
+        print(new_args)
+        return sp.Piecewise(*new_args)
+    return sp.simplify(expr)
+
 
 if __name__ == '__main__':
     # print(generate_periodic_seg([1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0]))
