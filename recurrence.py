@@ -43,11 +43,11 @@ class Recurrence:
     def solve(self):
         # cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
         solver = z3.Solver()
+        tot_closed_form = []
         while solver.check() == z3.sat:
             m = solver.model()
             cur_initals = {var: m.eval(z3.Int(str(var)), model_completion=True).as_long() for var in self.variables}
             _, index_seq = self.solve_with_inits(cur_initals)
-            print(index_seq)
             ks = [sp.Symbol('_k%d' % i, integer=True) for i in range(len(index_seq) - 1)]
             closed_forms = []
             prev_closed_form = None
@@ -104,8 +104,10 @@ class Recurrence:
             constraint = [z3.substitute(c, *[(k, v) for k, v in zip(z3_ks, res_ks)]) for c in cnf]
             constraint = z3.simplify(z3.And(*constraint))
             # print(constraint)
-            print(constraint)
             solver.add(z3.Not(constraint))
+            tot_closed_form.append((closed_forms, constraint))
+        return tot_closed_form
+        
 
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
@@ -315,6 +317,39 @@ def to_z3(sp_expr):
         raise Exception('Conversion for "%s" has not been implemented yet' % type(self))
     return z3.simplify(res)
 
+def to_sympy(expr):
+    if z3.is_int_value(expr):
+        res = expr.as_long()
+    elif z3.is_const(expr):
+        res = sp.Symbol(str(expr), integer=True)
+    elif z3.is_add(expr):
+        res = sum([to_sympy(arg) for arg in expr.children()])
+    elif z3.is_sub(expr):
+        children = expr.children()
+        assert(len(children) == 2)
+        res = to_sympy(children[0]) - to_sympy(children[1])
+    elif z3.is_mul(expr):
+        children = expr.children()
+        res = reduce(lambda x, y: x*y, [to_sympy(ch) for ch in children])
+    elif z3.is_gt(expr):
+        children = expr.children()
+        res = to_sympy(children[0]) > to_sympy(children[1])
+    elif z3.is_lt(expr):
+        children = expr.children()
+        res = to_sympy(children[0]) < to_sympy(children[1])
+    elif z3.is_ge(expr):
+        children = expr.children()
+        res = to_sympy(children[0]) >= to_sympy(children[1])
+    elif z3.is_le(expr):
+        children = expr.children()
+        res = to_sympy(children[0]) <= to_sympy(children[1])
+    elif z3.is_not(expr):
+        children = expr.children()
+        res = sp.Not(to_sympy(children[0]))
+    else:
+        raise Exception('conversion for type "%s" is not implemented' % type(expr))
+    return res
+
 def my_simplify_sp(expr):
     return sp.simplify(expr)
     if isinstance(expr, sp.Piecewise):
@@ -347,9 +382,6 @@ def solve_k(constraints, k):
         solver.add(z3.Not(k == cur_sol))
     return cur_sol
 
-
-
-
 def z3_all_vars(expr):
     if z3.is_const(expr):
         if z3.is_int_value(expr):
@@ -374,4 +406,5 @@ if __name__ == '__main__':
     k = z3.Int('k')
     x, y = z3.Ints('x y')
     constraints = [k >= 1, z3.Not(x <= y + k), x <= 1 + y + k]
-    solve_k(constraints, k)
+    # solve_k(constraints, k)
+    print([to_sympy(c) for c in constraints])

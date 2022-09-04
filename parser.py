@@ -106,4 +106,4 @@ if __name__ == '__main__':
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
         res = recurrence.solve()
-        # print(res)
+        print(res)
