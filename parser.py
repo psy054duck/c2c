@@ -59,7 +59,7 @@ def p_transitions_2(p):
 
 def p_transition(p):
     '''transition : VARIABLE ASSIGN expr SEMI'''
-    p[0] = {sp.Symbol(p[1]): p[3]}
+    p[0] = {sp.Symbol(p[1], integer=True): p[3]}
 
 def p_expr_1(p):
     '''expr : factor PLUS expr'''
@@ -87,7 +87,7 @@ def p_factor_3(p):
 
 def p_operand_1(p):
     '''operand : VARIABLE'''
-    p[0] = sp.Symbol(p[1])
+    p[0] = sp.Symbol(p[1], integer=True)
 
 def p_operand_2(p):
     '''operand : NUMBER'''
@@ -101,9 +101,11 @@ parser = yacc.yacc()
 if __name__ == '__main__':
     with open('test.txt') as fp:
         recurrence = parser.parse(fp.read())
-        x = sp.Symbol('x')
-        y = sp.Symbol('y')
+        x = sp.Symbol('x', integer=True)
+        y = sp.Symbol('y', integer=True)
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
         res = recurrence.solve()
-        print(res)
+        # res.pp_print()
+        values = {x: 0, y: 10, Recurrence.inductive_var: 12}
+        print(res.eval(values))

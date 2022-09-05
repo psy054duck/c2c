@@ -1,15 +1,11 @@
-from configparser import InterpolationSyntaxError
-from fileinput import close
 from functools import reduce
-from http.client import InvalidURL
 from itertools import product
 import re
-from readline import insert_text
-from socket import IPV6_USE_MIN_MTU
 import sympy as sp
 from sympy.logic.boolalg import Boolean
 import random
 import z3
+from closed_form import Closed_form
 
 class Recurrence:
 
@@ -105,10 +101,15 @@ class Recurrence:
             constraint = z3.simplify(z3.And(*constraint))
             # print(constraint)
             solver.add(z3.Not(constraint))
-            tot_closed_form.append((closed_forms, constraint))
-        return tot_closed_form
+            subs_pairs = {k: to_sympy(k_z3) for k, k_z3 in zip(ks, res_ks)}
+            for i in range(len(closed_forms)):
+                closed_form = {var: closed_forms[i][var].subs(subs_pairs) for var in closed_forms[i]}
+                closed_forms[i] = closed_form
+            res_ks_sympy = [subs_pairs[var] for var in ks]
+            tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy))
+        res = Closed_form(tot_closed_form, Recurrence.inductive_var)
+        return res
         
-
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
         BOUND = 1000
@@ -346,6 +347,9 @@ def to_sympy(expr):
     elif z3.is_not(expr):
         children = expr.children()
         res = sp.Not(to_sympy(children[0]))
+    elif z3.is_and(expr):
+        children = expr.children()
+        res = sp.And(*[to_sympy(ch) for ch in children])
     else:
         raise Exception('conversion for type "%s" is not implemented' % type(expr))
     return res
