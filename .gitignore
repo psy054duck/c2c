@@ -2,3 +2,5 @@ __pycache__
 parsetab.py
 parser.out
 test.py
+test.c
+ast_cfg

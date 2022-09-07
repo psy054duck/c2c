@@ -57,9 +57,18 @@ def p_transitions_2(p):
     '''transitions : '''
     p[0] = {}
 
-def p_transition(p):
+def p_transition_1(p):
     '''transition : VARIABLE ASSIGN expr SEMI'''
     p[0] = {sp.Symbol(p[1], integer=True): p[3]}
+
+def p_transition_2(p):
+    '''transition : array_ref ASSIGN expr SEMI'''
+    p[0] = {p[1]: p[3]}
+
+def p_array_ref(p):
+    '''array_ref : VARIABLE LREC expr RREC'''
+    f = sp.Function(p[1])
+    p[0] = f(p[3])
 
 def p_expr_1(p):
     '''expr : factor PLUS expr'''
@@ -93,6 +102,10 @@ def p_operand_2(p):
     '''operand : NUMBER'''
     p[0] = sp.Integer(p[1])
 
+def p_operand_3(p):
+    '''operand : array_ref'''
+    p[0] = p[1]
+
 def p_error(p):
     print(p)
 
@@ -101,11 +114,11 @@ parser = yacc.yacc()
 if __name__ == '__main__':
     with open('test.txt') as fp:
         recurrence = parser.parse(fp.read())
-        x = sp.Symbol('x', integer=True)
-        y = sp.Symbol('y', integer=True)
+        # x = sp.Symbol('x', integer=True)
+        # y = sp.Symbol('y', integer=True)
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
-        res = recurrence.solve()
+        # res = recurrence.solve()
         # res.pp_print()
-        values = {x: 0, y: 10, Recurrence.inductive_var: 12}
-        print(res.eval(values))
+        # values = {x: 0, y: 10, Recurrence.inductive_var: 12}
+        # print(res.eval(values))

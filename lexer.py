@@ -8,7 +8,7 @@ keywords = (
 tokens = (
     'VARIABLE','NUMBER',
     'PLUS','MINUS','TIMES','DIV','EQ',
-    'LPAREN','RPAREN', 'LBRACK', 'RBRACK',
+    'LPAREN','RPAREN', 'LBRACK', 'RBRACK', 'LREC', 'RREC',
     'SEMI', 'ASSIGN',
     'GT', 'LT', 'GE', 'LE',
     ) + tuple(k.upper() for k in keywords)
@@ -24,6 +24,8 @@ t_LBRACK = r'{'
 t_RBRACK = r'}'
 t_LPAREN = r'\('
 t_RPAREN = r'\)'
+t_LREC = r'\['
+t_RREC = r'\]'
 t_SEMI = r';'
 t_ASSIGN = r'='
 t_EQ = r'=='

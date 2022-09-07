@@ -1,5 +1,6 @@
 if (x > y) {
     y = y + 1;
+    a[y] = a[y+1] + x;
 } else {
     x = x + 1;
 }
