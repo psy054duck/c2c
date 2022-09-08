@@ -1,5 +1,6 @@
+from copy import deepcopy
 from logging import exception
-from pycparser import parse_file
+from pycparser import parse_file, c_generator
 from pycparser.c_ast import *
 import sympy as sp
 
@@ -16,6 +17,7 @@ class Vectorizer:
             res = self.visit(ext)
             if isinstance(ext, Decl):
                 self.symbol_table[res[0]] = res[1]
+        return node
 
 
     def visit_Decl(self, node):
@@ -49,13 +51,18 @@ class Vectorizer:
         return t, args
 
     def visit_FuncDef(self, node):
+        old_symbol_table = deepcopy(self.symbol_table)
         func_name = node.decl.name
         t, args = self.visit_FuncDecl(node.decl.type)
         self.visit(node.body)
+        self.symbol_table = old_symbol_table
 
     def visit_Compound(self, node):
-        for block in node.block_items:
-            res = self.visit(block)
+        res = []
+        for block_item in node.block_items:
+            b = self.visit(block_item)
+            res.append(b)
+        return res
 
     def visit_BinaryOp(self, node):
         left = self.visit(node.left)
@@ -96,6 +103,39 @@ class Vectorizer:
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
+        print(stmt)
+        print(flat_body(stmt))
+    
+    def visit_If(self, node):
+        cond = self.visit(node.cond)
+        iftrue = self.visit(node.iftrue)
+        iffalse = self.visit(node.iffalse)
+        return (cond, iftrue, iffalse)
+
+    def visit_Assignment(self, node):
+        op = node.op
+        lvalue = self.visit(node.lvalue)
+        rvalue = self.visit(node.rvalue)
+        if op == '=':
+            return (lvalue, rvalue)
+        elif op == '+=':
+            return (lvalue, lvalue + rvalue)
+        elif op == '-=':
+            return (lvalue, lvalue - rvalue)
+        elif op == '*=':
+            return (lvalue, lvalue * rvalue)
+        elif op == '/=':
+            return (lvalue, lvalue / rvalue) # type
+        else:
+            raise Exception('operation "%s" is no implemented' % op)
+
+    def visit_ArrayRef(self, node):
+        name = sp.Function(str(self.visit(node.name)))
+        subscript = self.visit(node.subscript)
+        return name(subscript)
+
+    def visit_Return(self, node):
+        expr = self.visit(node.expr)
 
     def visit_ID(self, node):
         return sp.Symbol(node.name)
@@ -113,8 +153,59 @@ class Vectorizer:
     def unimplemented_visit(self, node):
         raise Exception('visitor for "%s" is not implemented' % type(node))
 
+def for2rec(init, nex, body):
+    print(flat_body(body))
+
+def flat_body(body):
+    res_cond = [True]
+    res_stmt = [[]]
+    is_if = lambda x: len(x) > 0 and (x[0].is_Boolean or x[0].is_Relational)
+    if len(body) == 1:
+        stmt = body[0]
+        if is_if(stmt):
+            return [stmt[0], sp.Not(stmt[0])], [stmt[1], stmt[2]]
+        return [True], [[stmt]]
+    elif len(body) == 0:
+        return [], []
+
+    for item in body:
+        if is_if(item):
+            cond, iftrue, iffalse = item
+        else:
+            cond = True
+            iftrue = [item]
+            iffalse = []
+
+        t_conds, t_recs = flat_body(iftrue)
+        f_conds, f_recs = flat_body(iffalse)
+        # if is_if(iftrue):
+        #     t_conds, *t_recs = flat_body(iftrue)
+        # else:
+        #     t_conds = [True]
+        #     t_recs = iftrue
+
+        # if is_if(iffalse):
+        #     f_conds, *f_recs = flat_body(iffalse)
+        # else:
+        #     f_conds = [True]
+        #     f_recs = iffalse
+
+        t_conds = [sp.And(cond, c) for c in t_conds]
+        f_conds = [sp.And(sp.Not(cond), c) for c in f_conds]
+        stmt = t_recs + f_recs
+        cur_cond = []
+        cur_stmt = []
+        for i, cond1 in enumerate(res_cond):
+            for j, cond2 in enumerate(t_conds + f_conds):
+                cur_cond.append(sp.And(cond1, cond2))
+                cur_stmt.append(res_stmt[i] + stmt[j])
+        res_cond = cur_cond
+        res_stmt = cur_stmt
+    return res_cond, res_stmt
 
 if __name__ == '__main__':
     c_ast = parse_file('test.c', use_cpp=True)
     vectorizer = Vectorizer()
-    vectorizer.visit(c_ast)
+    new_ast = vectorizer.visit(c_ast)
+    generator = c_generator.CGenerator()
+    generator.visit(new_ast)
