@@ -9,7 +9,6 @@ int s276(int q)
 	int mid = (LEN/2);
 	for (int nl = 0; nl < 4*ntimes; nl++) {
 		for (int i = 0; i < LEN; i++) {
-			i = i + 1;
 			if (i+1 < mid) {
 				a[i] += b[i] * c[i];
 			} else {

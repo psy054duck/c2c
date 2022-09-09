@@ -103,8 +103,7 @@ class Vectorizer:
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
-        print(stmt)
-        print(flat_body(stmt))
+        for2rec(init, nex, stmt)
     
     def visit_If(self, node):
         cond = self.visit(node.cond)
@@ -154,7 +153,7 @@ class Vectorizer:
         raise Exception('visitor for "%s" is not implemented' % type(node))
 
 def for2rec(init, nex, body):
-    print(flat_body(body))
+    print(flat_body(body + [nex]))
 
 def flat_body(body):
     res_cond = [True]
@@ -178,17 +177,6 @@ def flat_body(body):
 
         t_conds, t_recs = flat_body(iftrue)
         f_conds, f_recs = flat_body(iffalse)
-        # if is_if(iftrue):
-        #     t_conds, *t_recs = flat_body(iftrue)
-        # else:
-        #     t_conds = [True]
-        #     t_recs = iftrue
-
-        # if is_if(iffalse):
-        #     f_conds, *f_recs = flat_body(iffalse)
-        # else:
-        #     f_conds = [True]
-        #     f_recs = iffalse
 
         t_conds = [sp.And(cond, c) for c in t_conds]
         f_conds = [sp.And(sp.Not(cond), c) for c in f_conds]
@@ -197,14 +185,15 @@ def flat_body(body):
         cur_stmt = []
         for i, cond1 in enumerate(res_cond):
             for j, cond2 in enumerate(t_conds + f_conds):
-                cur_cond.append(sp.And(cond1, cond2))
-                cur_stmt.append(res_stmt[i] + stmt[j])
+                subs_pairs = res_stmt[i]
+                cur_cond.append(sp.And(cond1, cond2.subs(subs_pairs)))
+                cur_stmt.append(res_stmt[i] + [(var if isinstance(var, sp.Symbol) else var.subs(subs_pairs), s.subs(subs_pairs)) for var, s in stmt[j]])
         res_cond = cur_cond
         res_stmt = cur_stmt
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    c_ast = parse_file('test.c', use_cpp=True)
+    c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10')
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
