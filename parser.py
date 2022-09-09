@@ -119,11 +119,11 @@ parser = yacc.yacc()
 if __name__ == '__main__':
     with open('rec.txt') as fp:
         recurrence = parser.parse(fp.read())
-        # x = sp.Symbol('x', integer=True)
-        # y = sp.Symbol('y', integer=True)
+        x = sp.Symbol('x', integer=True)
+        y = sp.Symbol('y', integer=True)
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
         res = recurrence.solve()
         res.pp_print()
-        # values = {x: 0, y: 10, Recurrence.inductive_var: 12}
-        # print(res.eval(values))
+        values = {x: -10, y: 10, Recurrence.inductive_var: 11}
+        print(res.eval(values))

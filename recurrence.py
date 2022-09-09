@@ -82,39 +82,41 @@ class Recurrence:
                     prev_k = z3_ks[i-1]
                 else:
                     prev_k = 0
+                if i > 0:
+                    cur_closed_form = {var: sp.cancel(cur_closed_form[var].subs(Recurrence.inductive_var, Recurrence.inductive_var - sp.Symbol(str(prev_k), integer=True))) for var in cur_closed_form}
+                else:
+                    cur_closed_form = {var: sp.cancel(cur_closed_form[var]) for var in cur_closed_form}
                 seq = index_seq[i]
                 for j, s in enumerate(seq):
                     shifted_ind_var = len(seq)*z3_ind_var + j
                     shifted_closed_form = {to_z3(var): z3.substitute(to_z3(cur_closed_form[var]), (z3_ind_var, shifted_ind_var)) for var in cur_closed_form}
                     validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
-                    validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(prev_k <= shifted_ind_var, shifted_ind_var< k), validation_cond))
+                    validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= shifted_ind_var, shifted_ind_var< k), validation_cond))
                     validation_conditions = z3.And(validation_conditions, validation_cond, k >= 1)
-                    # print(validation_cond, k >= 1)
-            # print(validation_conditions)
             prev_k = z3_ks[-1] if len(z3_ks) > 0 else 0
-            # if len(z3_ks) > 0:
-            #     cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(Recurrence.inductive_var, Recurrence.inductive_var - sp.Symbol(str(prev_k), integer=True))) for var in closed_forms[-1]}
-            # else:
-            cur_closed_form = {var: sp.cancel(closed_forms[-1][var]) for var in closed_forms[-1]}
+            if len(z3_ks) > 0:
+                cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(Recurrence.inductive_var, Recurrence.inductive_var - sp.Symbol(str(prev_k), integer=True))) for var in closed_forms[-1]}
+            else:
+                cur_closed_form = {var: sp.cancel(closed_forms[-1][var]) for var in closed_forms[-1]}
             seq = index_seq[-1]
             for j, s in enumerate(seq):
                 shifted_ind_var = len(seq)*Recurrence.inductive_var + j
-                shifted_closed_form = {to_z3(var): to_z3(sp.simplify(cur_closed_form[var].subs(Recurrence.inductive_var, shifted_ind_var))) for var in cur_closed_form}
+                shifted_closed_form = {to_z3(var): to_z3(cur_closed_form[var].subs(Recurrence.inductive_var, shifted_ind_var)) for var in cur_closed_form}
                 validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
-                validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(prev_k <= to_z3(shifted_ind_var)), validation_cond))
+                validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= to_z3(shifted_ind_var)), validation_cond))
                 validation_conditions = z3.And(validation_conditions, validation_cond)
-            print(validation_conditions)
             cnf = z3_qe(z3.simplify(validation_conditions))[0]
             res_ks = [solve_k(cnf, k) for k in z3_ks]
             constraint = [z3.substitute(c, *[(k, v) for k, v in zip(z3_ks, res_ks)]) for c in cnf]
+            constraint = [z3.substitute(c, *[(to_z3(var), to_z3(self.inits[var])) for var in self.inits]) for c in constraint]
             constraint = z3.simplify(z3.And(*constraint))
-            # print(constraint)
             solver.add(z3.Not(constraint))
-            subs_pairs = {k: to_sympy(k_z3) for k, k_z3 in zip(ks, res_ks)}
+            subs_pairs1 = {k: to_sympy(k_z3) for k, k_z3 in zip(ks, res_ks)}
+            subs_pairs2 = {var: self.inits[var] for var in self.inits}
             for i in range(len(closed_forms)):
-                closed_form = {var: closed_forms[i][var].subs(subs_pairs) for var in closed_forms[i]}
+                closed_form = {var: closed_forms[i][var].subs(subs_pairs1, simultaneous=True).subs(subs_pairs2, simultaneous=True) for var in closed_forms[i]}
                 closed_forms[i] = closed_form
-            res_ks_sympy = [subs_pairs[var] for var in ks]
+            res_ks_sympy = [subs_pairs1[var].subs(subs_pairs2, simultaneous=True) for var in ks]
             tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy))
         res = Closed_form(tot_closed_form, Recurrence.inductive_var)
         return res

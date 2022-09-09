@@ -1,5 +1,6 @@
-if (i < mid) {
-	i = i + 1;
+x = 11;
+if (x < y) {
+	x = x + 1;
 } else {
-	mid = mid + 1;
+	y = y + 1;
 } 
