@@ -103,7 +103,7 @@ class Vectorizer:
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
-        for2rec(init, nex, stmt)
+        for2rec(init, nex, stmt, filename='rec.txt')
     
     def visit_If(self, node):
         cond = self.visit(node.cond)
@@ -153,12 +153,22 @@ class Vectorizer:
         raise Exception('visitor for "%s" is not implemented' % type(node))
 
 def for2rec(init, nex, body, filename=None):
-    conds, stmt = flat_body(body + [nex])
+    conds, stmts = flat_body(body + [nex])
     if filename is None:
         pass
     else:
         with open(filename, 'w') as fp:
-            pass
+            s = 'if (%s) {\n' % conds[0]
+            s += '%s\n' % _transform_stmt(stmts[0])
+            s += '} '
+            for cond, stmt in zip(conds[1:], stmts[1:]):
+                s += 'else if (%s) {\n' % cond
+                s += '%s\n' % _transform_stmt(stmt)
+                s += '} '
+            fp.write(s)
+
+def _transform_stmt(stmts):
+    return '\n'.join(['\t%s = %s;' % (var, expr) for var, expr in stmts])
 
 def flat_body(body):
     res_cond = [True]
@@ -198,7 +208,8 @@ def flat_body(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10')
+    # c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10')
+    c_ast = parse_file('test.c', use_cpp=True)
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()

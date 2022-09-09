@@ -11,13 +11,20 @@ class Recurrence:
 
     inductive_var = sp.Symbol('_n', integer=True)
 
-    def __init__(self, conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]]):
-        self.conditions = conditions
+    def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]]):
+        self.inits = inits
         self.conditions = [conditions[0]]
         for i, cond in enumerate(conditions[1:]):
             self.conditions.append(sp.And(sp.Not(self.conditions[-1]), cond))
         self.transitions = transitions
-        self.variables = reduce(set.union, [set(t.keys()) for t in transitions])
+        self.variables = reduce(set.union, [set(k for k in t.keys()) for t in transitions])
+        self.arity = {}
+        for var in self.variables:
+            for trans in self.transitions:
+                for t in trans:
+                    if var.name == t.name:
+                        self.arity[var] = len(t.args)
+                        break
 
     def __str__(self):
         res = []
@@ -39,6 +46,7 @@ class Recurrence:
     def solve(self):
         # cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
         solver = z3.Solver()
+        solver.add(*[to_z3(var) == to_z3(self.inits[var]) for var in self.inits])
         tot_closed_form = []
         while solver.check() == z3.sat:
             m = solver.model()
@@ -84,10 +92,10 @@ class Recurrence:
                     # print(validation_cond, k >= 1)
             # print(validation_conditions)
             prev_k = z3_ks[-1] if len(z3_ks) > 0 else 0
-            if len(z3_ks) > 0:
-                cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(Recurrence.inductive_var, Recurrence.inductive_var + sp.Symbol(str(prev_k), integer=True))) for var in closed_forms[-1]}
-            else:
-                cur_closed_form = {var: sp.cancel(closed_forms[-1][var]) for var in closed_forms[-1]}
+            # if len(z3_ks) > 0:
+            #     cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(Recurrence.inductive_var, Recurrence.inductive_var - sp.Symbol(str(prev_k), integer=True))) for var in closed_forms[-1]}
+            # else:
+            cur_closed_form = {var: sp.cancel(closed_forms[-1][var]) for var in closed_forms[-1]}
             seq = index_seq[-1]
             for j, s in enumerate(seq):
                 shifted_ind_var = len(seq)*Recurrence.inductive_var + j
@@ -95,6 +103,7 @@ class Recurrence:
                 validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
                 validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(prev_k <= to_z3(shifted_ind_var)), validation_cond))
                 validation_conditions = z3.And(validation_conditions, validation_cond)
+            print(validation_conditions)
             cnf = z3_qe(z3.simplify(validation_conditions))[0]
             res_ks = [solve_k(cnf, k) for k in z3_ks]
             constraint = [z3.substitute(c, *[(k, v) for k, v in zip(z3_ks, res_ks)]) for c in cnf]
@@ -146,13 +155,15 @@ class Recurrence:
             res += non_periodic_res
             res_index_seq.extend(non_periodic_res_index)
             periodic_closed_form = self.solve_periodic(periodic_seg)
+            validate_closed_form = [{v: closed_form[v].subs(values[threshold]) for v in closed_form} for closed_form in periodic_closed_form]
+            cur_smallest = self.validate(validate_closed_form, periodic_seg)
             periodic_closed_form = [{v: closed_form[v].subs(values[threshold] | {Recurrence.inductive_var: Recurrence.inductive_var - threshold}) for v in closed_form} for closed_form in periodic_closed_form]
-            cur_smallest = self.validate(periodic_closed_form, periodic_seg)
+            # cur_smallest = self.validate(periodic_closed_form, periodic_seg)
             res_index_seq.append(periodic_seg)
             if cur_smallest == -1:
                 return res + [(sp.S.true, periodic_closed_form)], res_index_seq
             else:
-                res += [(Recurrence.inductive_var < smallest + cur_smallest, periodic_closed_form)]
+                res += [(Recurrence.inductive_var < smallest + cur_smallest + threshold, periodic_closed_form)]
             cur_inits = self.kth_values(values[smallest], cur_smallest)
             smallest = smallest + cur_smallest
 

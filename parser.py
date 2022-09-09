@@ -4,10 +4,15 @@ from lexer import lexer, tokens
 from recurrence import Recurrence
 
 def p_recurrence(p):
-    '''recurrence : if_seq'''
-    conditions = [s[0] for s in p[1]]
-    transitions = [s[1] for s in p[1]]
-    p[0] = Recurrence(conditions, transitions)
+    '''recurrence : inits if_seq'''
+    inits = p[1]
+    conditions = [s[0] for s in p[2]]
+    transitions = [s[1] for s in p[2]]
+    p[0] = Recurrence(inits, conditions, transitions)
+
+def p_inits(p):
+    '''inits : transitions'''
+    p[0] = p[1]
 
 def p_if_seq_1(p):
     '''if_seq : if_statement'''
@@ -66,7 +71,7 @@ def p_transition_2(p):
     p[0] = {p[1]: p[3]}
 
 def p_array_ref(p):
-    '''array_ref : VARIABLE LREC expr RREC'''
+    '''array_ref : VARIABLE LPAREN expr RPAREN'''
     f = sp.Function(p[1])
     p[0] = f(p[3])
 
@@ -112,13 +117,13 @@ def p_error(p):
 parser = yacc.yacc()
 
 if __name__ == '__main__':
-    with open('test.txt') as fp:
+    with open('rec.txt') as fp:
         recurrence = parser.parse(fp.read())
         # x = sp.Symbol('x', integer=True)
         # y = sp.Symbol('y', integer=True)
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
-        # res = recurrence.solve()
-        # res.pp_print()
+        res = recurrence.solve()
+        res.pp_print()
         # values = {x: 0, y: 10, Recurrence.inductive_var: 12}
         # print(res.eval(values))

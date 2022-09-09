@@ -1,0 +1,5 @@
+if (i < mid) {
+	i = i + 1;
+} else {
+	mid = mid + 1;
+} 
