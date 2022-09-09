@@ -152,8 +152,13 @@ class Vectorizer:
     def unimplemented_visit(self, node):
         raise Exception('visitor for "%s" is not implemented' % type(node))
 
-def for2rec(init, nex, body):
-    print(flat_body(body + [nex]))
+def for2rec(init, nex, body, filename=None):
+    conds, stmt = flat_body(body + [nex])
+    if filename is None:
+        pass
+    else:
+        with open(filename, 'w') as fp:
+            pass
 
 def flat_body(body):
     res_cond = [True]
