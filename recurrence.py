@@ -43,6 +43,14 @@ class Recurrence:
                     break
         return cur
 
+    def solve_array(self):
+        self.extract_scalar_part()
+
+    def extract_scalar_part(self):
+        scalar_vars = {var for var in self.arity if self.arity[var] == 0}
+        scalar_transitions = [{var: trans[var] for var in scalar_vars} for trans in self.transitions]
+        print(scalar_transitions)
+
     def solve(self):
         # cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
         solver = z3.Solver()
@@ -152,7 +160,6 @@ class Recurrence:
                 else:
                     cur_closed_form = [{v: closed_form[v].subs(values[cur_threshold]) for v in closed_form} for closed_form in cur_closed_form]
                     non_periodic_res.append((Recurrence.inductive_var < smallest + threshold, cur_closed_form))
-                # res.append((Recurrence.inductive_var < threshold + smallest, non_periodic_closed_form))
                 prev_threshold = cur_threshold
             res += non_periodic_res
             res_index_seq.extend(non_periodic_res_index)
@@ -160,7 +167,6 @@ class Recurrence:
             validate_closed_form = [{v: closed_form[v].subs(values[threshold]) for v in closed_form} for closed_form in periodic_closed_form]
             cur_smallest = self.validate(validate_closed_form, periodic_seg)
             periodic_closed_form = [{v: closed_form[v].subs(values[threshold] | {Recurrence.inductive_var: Recurrence.inductive_var - threshold}) for v in closed_form} for closed_form in periodic_closed_form]
-            # cur_smallest = self.validate(periodic_closed_form, periodic_seg)
             res_index_seq.append(periodic_seg)
             if cur_smallest == -1:
                 return res + [(sp.S.true, periodic_closed_form)], res_index_seq
