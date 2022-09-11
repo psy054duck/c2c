@@ -1,5 +1,6 @@
 from functools import reduce
 from os import scandir
+import random
 import sympy as sp
 from sympy.logic.boolalg import Boolean, true, false
 import z3
@@ -20,6 +21,7 @@ class Recurrence:
         self._combine_branches()
         self.variables = reduce(set.union, [set(k for k in t.keys()) for t in transitions])
         self.variables = self.variables.union(reduce(set.union, [cond.free_symbols for cond in self.conditions]))
+        # self.variables = self.variables - {self.ind_var}
         self.arity = {}
         for var in self.variables:
             for trans in self.transitions:
@@ -40,7 +42,7 @@ class Recurrence:
                 if trans2 in new_transitions: continue
                 if trans1 == trans2:
                     new_condition = sp.Or(cond1, cond2)
-            new_conditions.append(new_condition)
+            new_conditions.append(sp.simplify(new_condition))
             new_transitions.append(trans1)
         self.conditions = new_conditions
         self.transitions = new_transitions
@@ -66,10 +68,11 @@ class Recurrence:
         # t_list = self._prepare_t()
         scalar_rec = self.to_scalar()
         scalar_closed_form = scalar_rec.solve()
-        d = sp.Symbol('_d', integer=True)
-        neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - d - 1}).to_sympy()
+        neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - Recurrence.neg_ind_var - 1}).to_sympy()
         new_conditions = [cond.subs(neg_scalar_closed_form_sp) for cond in self.conditions]
-        self._t_transitions(neg_scalar_closed_form_sp)
+        new_rec = self._t_transitions(neg_scalar_closed_form_sp)
+        res = new_rec.solve()
+        res.pp_print()
 
 
     def extract_scalar_part(self):
@@ -84,25 +87,38 @@ class Recurrence:
 
     def _prepare_t(self):
         array_var = [var for var in self.arity if self.arity[var] >= 1][0] # assume there is only one array
-        t_list = [sp.Symbol('t%d' % i) for i in range(self.arity[array_var])]
+        t_list = [sp.Symbol('_t%d' % i, integer=True) for i in range(self.arity[array_var])]
         return t_list
 
     def _t_transitions(self, scalar_closed_form):
         t_list = self._prepare_t()
+        u_list = [sp.Symbol('_u%d' % i, integer=True) for i in range(len(t_list))]
         transitions = []
-        for trans in self.transitions:
+        new_conditions = []
+        d = sp.Symbol('d_p', integer=True)
+        scalar_closed_form = {var: scalar_closed_form[var].subs(Recurrence.neg_ind_var, d) for var in scalar_closed_form}
+        for cond, trans in zip(self.conditions, self.transitions):
             array_trans = {var: trans[var] for var in trans if self.arity.get(var, 0) >= 1}
-
+            for app in array_trans:
+                cond_arr = sp.And(*[sp.Eq(t, arg.subs(scalar_closed_form)) for t, arg in zip(t_list, app.args)])
+                new_conditions.append(sp.simplify(sp.And(cond.subs(scalar_closed_form), cond_arr)))
+                new_trans = {t: arg.subs(scalar_closed_form, simultaneous=True) for arg, t in zip(app.args, t_list)}
+                transitions.append(new_trans | {d: d + 1})
+        new_conditions.append(sp.simplify(sp.Not(sp.Or(*[cond for cond in new_conditions]))))
+        transitions.append({t: t for t in t_list} | {d: d + 1})
+        return Recurrence({d: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var)
 
     def solve(self):
-        # cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
+        print('hhhh')
         solver = z3.Solver()
         solver.add(*[to_z3(var) == to_z3(self.inits[var]) for var in self.inits])
         tot_closed_form = []
         while solver.check() == z3.sat:
             m = solver.model()
             cur_initals = {var: m.eval(z3.Int(str(var)), model_completion=True).as_long() for var in self.variables}
+            print(cur_initals)
             _, index_seq = self.solve_with_inits(cur_initals)
+            print(index_seq)
             ks = [sp.Symbol('_k%d' % i, integer=True) for i in range(len(index_seq) - 1)]
             closed_forms = []
             prev_closed_form = None
@@ -125,6 +141,7 @@ class Recurrence:
             z3_qe = z3.Then('qe', 'ctx-solver-simplify', 'ctx-simplify')
             # z3_qe = z3.Tactic('qe')
             z3_ind_var = z3.Int(str(self.ind_var))
+
             validation_conditions = z3.BoolVal(True)
             z3_ks = [to_z3(k) for k in ks]
             for i, k in enumerate(z3_ks):
@@ -134,7 +151,7 @@ class Recurrence:
                 else:
                     prev_k = 0
                 if i > 0:
-                    cur_closed_form = {var: sp.cancel(cur_closed_form[var].subs(self.ind_var, self.ind_var - sp.Symbol(str(prev_k), integer=True))) for var in cur_closed_form}
+                    cur_closed_form = {var: sp.cancel(cur_closed_form[var].subs(self.ind_var, self.ind_var + sp.Symbol(str(prev_k), integer=True))) for var in cur_closed_form}
                 else:
                     cur_closed_form = {var: sp.cancel(cur_closed_form[var]) for var in cur_closed_form}
                 seq = index_seq[i]
@@ -142,21 +159,27 @@ class Recurrence:
                     shifted_ind_var = len(seq)*z3_ind_var + j
                     shifted_closed_form = {to_z3(var): z3.substitute(to_z3(cur_closed_form[var]), (z3_ind_var, shifted_ind_var)) for var in cur_closed_form}
                     validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
-                    validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= shifted_ind_var, shifted_ind_var< k), validation_cond))
+                    validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= shifted_ind_var, shifted_ind_var < k), validation_cond))
                     validation_conditions = z3.And(validation_conditions, validation_cond, k >= 1)
             prev_k = z3_ks[-1] if len(z3_ks) > 0 else 0
             if len(z3_ks) > 0:
-                cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(self.ind_var, self.ind_var - sp.Symbol(str(prev_k), integer=True))) for var in closed_forms[-1]}
+                cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(self.ind_var, self.ind_var + sp.Symbol(str(prev_k), integer=True))) for var in closed_forms[-1]}
             else:
                 cur_closed_form = {var: sp.cancel(closed_forms[-1][var]) for var in closed_forms[-1]}
             seq = index_seq[-1]
+            print(cur_closed_form)
             for j, s in enumerate(seq):
                 shifted_ind_var = len(seq)*self.ind_var + j
                 shifted_closed_form = {to_z3(var): to_z3(cur_closed_form[var].subs(self.ind_var, shifted_ind_var)) for var in cur_closed_form}
                 validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
                 validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= to_z3(shifted_ind_var)), validation_cond))
+                print(z3_qe(validation_cond))
                 validation_conditions = z3.And(validation_conditions, validation_cond)
+            print(self.conditions)
+            print(validation_conditions)
             cnf = z3_qe(z3.simplify(validation_conditions))[0]
+            print(cnf)
+
             res_ks = [solve_k(cnf, k) for k in z3_ks]
             constraint = [z3.substitute(c, *[(k, v) for k, v in zip(z3_ks, res_ks)]) for c in cnf]
             constraint = [z3.substitute(c, *[(to_z3(var), to_z3(self.inits[var])) for var in self.inits]) for c in constraint]
@@ -302,9 +325,26 @@ class Recurrence:
     @staticmethod
     def solve_linear_rec(linear_transition: dict[sp.Symbol, sp.Expr], ind_var):
         ordered_vars, matrix_form = Recurrence.linear2matrix(linear_transition)
-        matrix_closed_form = sp.MatPow(matrix_form, ind_var, evaluate=True)
-        assert(not isinstance(matrix_closed_form, sp.MatPow))
-        return Recurrence.matrix2linear(ordered_vars, matrix_closed_form)
+        # matrix_closed_form = sp.MatPow(matrix_form, ind_var, evaluate=True)
+        P, J = matrix_form.jordan_form()
+        _, cells = J.jordan_cells()
+        cells = [sp.MatPow(m, ind_var, evaluate=True) if not m.is_zero_matrix else m for m in cells]
+        shape = J.shape
+        middle = sp.zeros(*shape)
+        x, y = 0, 0
+        for cell in cells:
+            cell_x, cell_y = cell.shape
+            for i in range(cell_x):
+                for j in range(cell_y):
+                    middle[x + i, y + j] = cell[i, j]
+            x += cell_x
+            y += cell_y
+        matrix_closed_form = (P*middle*P.inv()).subs(0**ind_var, 0)
+        linear_form = Recurrence.matrix2linear(ordered_vars, matrix_closed_form)
+        if matrix_form.rank() != matrix_form.shape[0]:
+            linear_form = {var: sp.Piecewise((var, sp.Eq(ind_var, 0)), (linear_form[var], True)) for var in linear_form}
+        return linear_form
+
 
     @staticmethod
     def to_linear(transitions: list[dict[sp.Symbol, sp.Expr]]):
@@ -360,8 +400,11 @@ def to_z3(sp_expr):
         return z3.simplify(res)
         # return reduce(lambda x, y: x*y, [to_z3(arg) for arg in reversed(self.args)])
     elif isinstance(self, sp.Piecewise):
-        cond  = to_z3(self.args[0][1])
-        res = z3.If(cond, to_z3(self.args[0][0]), to_z3(self.args[1][0]))
+        if len(self.args) == 1:
+            res = to_z3(self.args[0][0])
+        else:
+            cond  = to_z3(self.args[0][1])
+            res = z3.If(cond, to_z3(self.args[0][0]), to_z3(self.args[1][0]))
     elif isinstance(self, sp.And):
         res = z3.And(*[to_z3(arg) for arg in self.args])
     elif isinstance(self, sp.Or):
@@ -388,7 +431,7 @@ def to_z3(sp_expr):
         # return z3.RatVal(self.numerator, self.denominator)
         res = z3.IntVal(self.numerator) / z3.IntVal(self.denominator)
     elif isinstance(self, sp.Pow):
-        if self.base == 0: return z3.IntVal(0)
+        if self.base == 0: res = z3.IntVal(0)
         else: raise Exception('%s' % self)
     elif isinstance(self, sp.Mod):
         res = to_z3(self.args[0]) % to_z3(self.args[1])
@@ -440,6 +483,9 @@ def to_sympy(expr):
     elif z3.is_and(expr):
         children = expr.children()
         res = sp.And(*[to_sympy(ch) for ch in children])
+    elif z3.is_or(expr):
+        children = expr.children()
+        res = sp.Or(*[to_sympy(ch) for ch in children])
     else:
         raise Exception('conversion for type "%s" is not implemented: %s' % (type(expr), expr))
     return sp.simplify(res)
@@ -468,7 +514,12 @@ def solve_k(constraints, k):
             m = solver.model()
             eq = (m[k] == m.eval(template))
             eqs.append(eq)
-            solver.add(*[z3.Not(var == m[var]) for var in all_vars + [k]])
+            solver.push()
+            var = random.choice(all_vars + [k])
+            solver.add(z3.Not(var == m[var]))
+            if solver.check() != z3.sat:
+                solver.pop()
+            # solver.add(*[z3.Not(var == m[var]) for var in all_vars + [k]])
         linear_solver.add(*eqs)
         linear_solver.check()
         m_c = linear_solver.model()
