@@ -10,9 +10,9 @@ int s276(int q)
 	for (int nl = 0; nl < 4*ntimes; nl++) {
 		for (int i = 0; i < LEN; i++) {
 			if (i+1 < mid) {
-				a[i] += b[i] * c[i];
+				a[i] += 1;
 			} else {
-				a[i] += b[i] * d[i];
+				a[i] += 2;
 			}
 		}
 	}

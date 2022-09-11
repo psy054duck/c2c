@@ -208,8 +208,8 @@ def flat_body(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10')
-    # c_ast = parse_file('test.c', use_cpp=True)
+    # c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10')
+    c_ast = parse_file('test.c', use_cpp=True)
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()

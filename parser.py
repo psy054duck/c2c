@@ -36,7 +36,7 @@ def p_cond_1(p):
 
 def p_atom_cond_1(p):
     '''atom_cond : expr EQ expr'''
-    p[0] = p[1] == p[3]
+    p[0] = sp.Eq(p[1], p[3])
 
 def p_atom_cond_2(p):
     '''atom_cond : expr GT expr'''
@@ -96,6 +96,10 @@ def p_factor_2(p):
     p[0] = p[1] / p[3]
 
 def p_factor_3(p):
+    '''factor : factor MOD operand'''
+    p[0] = p[1] % p[3]
+
+def p_factor_4(p):
     '''factor : operand'''
     p[0] = p[1]
 
@@ -117,13 +121,13 @@ def p_error(p):
 parser = yacc.yacc()
 
 if __name__ == '__main__':
-    with open('rec.txt') as fp:
+    with open('test.txt') as fp:
         recurrence = parser.parse(fp.read())
         x = sp.Symbol('x', integer=True)
         y = sp.Symbol('y', integer=True)
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
-        res = recurrence.solve_array()
-        # res.pp_print()
+        res = recurrence.solve()
+        res.pp_print()
         # values = {x: -10, y: 10, Recurrence.inductive_var: 11}
         # print(res.eval(values))

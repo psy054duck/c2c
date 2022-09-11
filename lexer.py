@@ -7,7 +7,7 @@ keywords = (
 
 tokens = (
     'VARIABLE','NUMBER',
-    'PLUS','MINUS','TIMES','DIV','EQ',
+    'PLUS','MINUS','TIMES','DIV','EQ', 'MOD',
     'LPAREN','RPAREN', 'LBRACK', 'RBRACK',
     'SEMI', 'ASSIGN',
     'GT', 'LT', 'GE', 'LE',
@@ -18,6 +18,7 @@ t_PLUS = r'\+'
 t_MINUS = r'\-'
 t_TIMES = r'\*'
 t_DIV = r'/'
+t_MOD = r'%'
 t_IF = r'if'
 t_ELSE = r'else'
 t_LBRACK = r'{'
