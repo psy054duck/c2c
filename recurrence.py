@@ -1,4 +1,5 @@
 from functools import reduce
+from os import scandir
 import sympy as sp
 from sympy.logic.boolalg import Boolean, true, false
 import z3
@@ -7,6 +8,7 @@ from closed_form import Closed_form
 class Recurrence:
 
     inductive_var = sp.Symbol('_n', integer=True)
+    neg_ind_var = sp.Symbol('_d', integer=True)
 
     def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]], ind_var=sp.Symbol('_n', integer=True)):
         self.ind_var = ind_var
@@ -25,8 +27,6 @@ class Recurrence:
                     if var.name == t.name:
                         self.arity[var] = len(t.args)
                         break
-        print(self.conditions)
-        print(self.transitions)
 
     def _combine_branches(self):
         new_conditions = []
@@ -63,9 +63,14 @@ class Recurrence:
         return cur
 
     def solve_array(self):
+        # t_list = self._prepare_t()
         scalar_rec = self.to_scalar()
         scalar_closed_form = scalar_rec.solve()
-        scalar_closed_form.pp_print()
+        d = sp.Symbol('_d', integer=True)
+        neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - d - 1}).to_sympy()
+        new_conditions = [cond.subs(neg_scalar_closed_form_sp) for cond in self.conditions]
+        self._t_transitions(neg_scalar_closed_form_sp)
+
 
     def extract_scalar_part(self):
         scalar_vars = {var for var in self.arity if self.arity[var] == 0}
@@ -76,6 +81,18 @@ class Recurrence:
         scalar_transitions = self.extract_scalar_part()
         scalar_rec = Recurrence(self.inits, self.conditions, scalar_transitions)
         return scalar_rec
+
+    def _prepare_t(self):
+        array_var = [var for var in self.arity if self.arity[var] >= 1][0] # assume there is only one array
+        t_list = [sp.Symbol('t%d' % i) for i in range(self.arity[array_var])]
+        return t_list
+
+    def _t_transitions(self, scalar_closed_form):
+        t_list = self._prepare_t()
+        transitions = []
+        for trans in self.transitions:
+            array_trans = {var: trans[var] for var in trans if self.arity.get(var, 0) >= 1}
+
 
     def solve(self):
         # cur_initals = {var: sp.Integer(random.randint(-10, 10)) for var in self.variables}
@@ -152,8 +169,19 @@ class Recurrence:
                 closed_forms[i] = closed_form
             res_ks_sympy = [sp.simplify(subs_pairs1[var].subs(subs_pairs2, simultaneous=True)) for var in ks]
             tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy))
-        res = Closed_form(tot_closed_form, self.ind_var)
+        # res = Closed_form(tot_closed_form, self.ind_var)
+        res = self._tot_closed_form2class(tot_closed_form)
         return res
+        
+    def _tot_closed_form2class(self, tot_closed_forms):
+        conditions = []
+        res_closed_forms = []
+        for closed_forms, cond, ks in tot_closed_forms:
+            prev_k = 0
+            for closed, k in zip(closed_forms, ks + [sp.oo]):
+                res_closed_forms.append(closed)
+                conditions.append(sp.simplify(sp.And(cond, prev_k <= self.ind_var, self.ind_var < k)))
+        return Closed_form(conditions, res_closed_forms, self.ind_var)
         
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10
@@ -375,6 +403,8 @@ def to_z3(sp_expr):
 def to_sympy(expr):
     if z3.is_int_value(expr):
         res = expr.as_long()
+    elif z3.is_const(expr) and z3.is_bool(expr):
+        res = sp.S.true if z3.is_true(expr) else sp.S.false
     elif z3.is_const(expr):
         res = sp.Symbol(str(expr), integer=True)
     elif z3.is_add(expr):
@@ -386,6 +416,9 @@ def to_sympy(expr):
     elif z3.is_mul(expr):
         children = expr.children()
         res = reduce(lambda x, y: x*y, [to_sympy(ch) for ch in children])
+    elif z3.is_mod(expr):
+        children = expr.children()
+        res = to_sympy(children[0]) % to_sympy(children[1])
     elif z3.is_gt(expr):
         children = expr.children()
         res = to_sympy(children[0]) > to_sympy(children[1])
@@ -398,6 +431,9 @@ def to_sympy(expr):
     elif z3.is_le(expr):
         children = expr.children()
         res = to_sympy(children[0]) <= to_sympy(children[1])
+    elif z3.is_eq(expr):
+        children = expr.children()
+        res = sp.Eq(to_sympy(children[0]), to_sympy(children[1]))
     elif z3.is_not(expr):
         children = expr.children()
         res = sp.Not(to_sympy(children[0]))
@@ -405,7 +441,7 @@ def to_sympy(expr):
         children = expr.children()
         res = sp.And(*[to_sympy(ch) for ch in children])
     else:
-        raise Exception('conversion for type "%s" is not implemented' % type(expr))
+        raise Exception('conversion for type "%s" is not implemented: %s' % (type(expr), expr))
     return sp.simplify(res)
 
 def my_simplify_sp(expr):
