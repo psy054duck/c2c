@@ -109,34 +109,36 @@ class Recurrence:
         return Recurrence({d: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var)
 
     def solve(self):
-        print('hhhh')
         solver = z3.Solver()
         solver.add(*[to_z3(var) == to_z3(self.inits[var]) for var in self.inits])
         tot_closed_form = []
         while solver.check() == z3.sat:
             m = solver.model()
             cur_initals = {var: m.eval(z3.Int(str(var)), model_completion=True).as_long() for var in self.variables}
-            print(cur_initals)
             _, index_seq = self.solve_with_inits(cur_initals)
-            print(index_seq)
             ks = [sp.Symbol('_k%d' % i, integer=True) for i in range(len(index_seq) - 1)]
             closed_forms = []
             prev_closed_form = None
             prev_k = None
-            for seq, k in zip(index_seq, ks):
+            prev_seq = None
+            for i, (seq, k) in enumerate(zip(index_seq, ks)):
                 cur_closed_form = self.solve_periodic(seq)
                 cur_closed_form = self.periodic_closed_form2sympy(cur_closed_form)
                 if prev_closed_form is not None:
-                    init_values = {var: prev_closed_form[var].subs(self.ind_var, prev_k) for var in prev_closed_form}
-                    cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(self.ind_var, self.ind_var - prev_k) for var in cur_closed_form}
+                    acc_k = sum(len(index_seq[j])*ks[j] for j in range(i))
+                    init_values = {var: prev_closed_form[var].subs(self.ind_var, acc_k) for var in prev_closed_form}
+                    cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(self.ind_var, self.ind_var - acc_k) for var in cur_closed_form}
                 prev_closed_form = cur_closed_form
                 prev_k = k
+                prev_seq = seq
                 closed_forms.append(cur_closed_form)
             cur_closed_form = self.solve_periodic(index_seq[-1])
             cur_closed_form = self.periodic_closed_form2sympy(cur_closed_form)
             if prev_closed_form is not None:
-                init_values = {var: prev_closed_form[var].subs(self.ind_var, prev_k) for var in prev_closed_form}
-                cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(self.ind_var, self.ind_var - prev_k) for var in cur_closed_form}
+                acc_k = sum(len(index_seq[j])*ks[j] for j in range(len(ks)))
+                init_values = {var: prev_closed_form[var].subs(self.ind_var, acc_k) for var in prev_closed_form}
+                # init_values = {var: prev_closed_form[var].subs(self.ind_var, len(prev_seq)*prev_k) for var in prev_closed_form}
+                cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(self.ind_var, self.ind_var - acc_k) for var in cur_closed_form}
             closed_forms.append(cur_closed_form)
             z3_qe = z3.Then('qe', 'ctx-solver-simplify', 'ctx-simplify')
             # z3_qe = z3.Tactic('qe')
@@ -146,12 +148,13 @@ class Recurrence:
             z3_ks = [to_z3(k) for k in ks]
             for i, k in enumerate(z3_ks):
                 cur_closed_form = closed_forms[i]
+                # if i > 0:
+                #     prev_k = z3_ks[i-1]
+                # else:
+                #     prev_k = 0
                 if i > 0:
-                    prev_k = z3_ks[i-1]
-                else:
-                    prev_k = 0
-                if i > 0:
-                    cur_closed_form = {var: sp.cancel(cur_closed_form[var].subs(self.ind_var, self.ind_var + sp.Symbol(str(prev_k), integer=True))) for var in cur_closed_form}
+                    acc_k = sum(len(index_seq[j])*ks[j] for j in range(i))
+                    cur_closed_form = {var: sp.cancel(cur_closed_form[var].subs(self.ind_var, self.ind_var + acc_k)) for var in cur_closed_form}
                 else:
                     cur_closed_form = {var: sp.cancel(cur_closed_form[var]) for var in cur_closed_form}
                 seq = index_seq[i]
@@ -159,31 +162,28 @@ class Recurrence:
                     shifted_ind_var = len(seq)*z3_ind_var + j
                     shifted_closed_form = {to_z3(var): z3.substitute(to_z3(cur_closed_form[var]), (z3_ind_var, shifted_ind_var)) for var in cur_closed_form}
                     validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
-                    validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= shifted_ind_var, shifted_ind_var < k), validation_cond))
+                    validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= shifted_ind_var, shifted_ind_var < len(seq)*k), validation_cond))
                     validation_conditions = z3.And(validation_conditions, validation_cond, k >= 1)
-            prev_k = z3_ks[-1] if len(z3_ks) > 0 else 0
+            # prev_k = z3_ks[-1] if len(z3_ks) > 0 else 0
             if len(z3_ks) > 0:
-                cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(self.ind_var, self.ind_var + sp.Symbol(str(prev_k), integer=True))) for var in closed_forms[-1]}
+                acc_k = sum(len(index_seq[j])*ks[j] for j in range(i))
+                cur_closed_form = {var: sp.cancel(closed_forms[-1][var].subs(self.ind_var, self.ind_var + acc_k)) for var in closed_forms[-1]}
             else:
                 cur_closed_form = {var: sp.cancel(closed_forms[-1][var]) for var in closed_forms[-1]}
             seq = index_seq[-1]
-            print(cur_closed_form)
             for j, s in enumerate(seq):
                 shifted_ind_var = len(seq)*self.ind_var + j
                 shifted_closed_form = {to_z3(var): to_z3(cur_closed_form[var].subs(self.ind_var, shifted_ind_var)) for var in cur_closed_form}
                 validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
                 validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= to_z3(shifted_ind_var)), validation_cond))
-                print(z3_qe(validation_cond))
                 validation_conditions = z3.And(validation_conditions, validation_cond)
-            print(self.conditions)
-            print(validation_conditions)
             cnf = z3_qe(z3.simplify(validation_conditions))[0]
-            print(cnf)
 
             res_ks = [solve_k(cnf, k) for k in z3_ks]
             constraint = [z3.substitute(c, *[(k, v) for k, v in zip(z3_ks, res_ks)]) for c in cnf]
             constraint = [z3.substitute(c, *[(to_z3(var), to_z3(self.inits[var])) for var in self.inits]) for c in constraint]
             constraint = z3.simplify(z3.And(*constraint))
+            sim = z3.Tactic('ctx-solver-simplify')
             solver.add(z3.Not(constraint))
             subs_pairs1 = {k: to_sympy(k_z3) for k, k_z3 in zip(ks, res_ks)}
             subs_pairs2 = {var: self.inits[var] for var in self.inits}
@@ -191,7 +191,7 @@ class Recurrence:
                 closed_form = {var: closed_forms[i][var].subs(subs_pairs1, simultaneous=True).subs(subs_pairs2, simultaneous=True) for var in closed_forms[i]}
                 closed_forms[i] = closed_form
             res_ks_sympy = [sp.simplify(subs_pairs1[var].subs(subs_pairs2, simultaneous=True)) for var in ks]
-            tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy))
+            tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy, index_seq))
         # res = Closed_form(tot_closed_form, self.ind_var)
         res = self._tot_closed_form2class(tot_closed_form)
         return res
@@ -199,11 +199,14 @@ class Recurrence:
     def _tot_closed_form2class(self, tot_closed_forms):
         conditions = []
         res_closed_forms = []
-        for closed_forms, cond, ks in tot_closed_forms:
-            prev_k = 0
-            for closed, k in zip(closed_forms, ks + [sp.oo]):
+        for closed_forms, cond, ks, index_seq in tot_closed_forms:
+            # prev_k = 0
+            # prev_seq = []
+            acc_k = 0
+            for closed, k, seq in zip(closed_forms, ks + [sp.oo], index_seq):
                 res_closed_forms.append(closed)
-                conditions.append(sp.simplify(sp.And(cond, prev_k <= self.ind_var, self.ind_var < k)))
+                conditions.append(sp.simplify(sp.And(cond, acc_k <= self.ind_var, self.ind_var < acc_k + len(seq)*k)))
+                acc_k += len(seq)*k
         return Closed_form(conditions, res_closed_forms, self.ind_var)
         
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
@@ -223,12 +226,14 @@ class Recurrence:
             non_periodic_res = []
             prev_threshold = threshold
             while cur_threshold != 0:
-                cur_threshold, cur_periodic_seg = generate_periodic_seg(index_seq[:prev_threshold])
+                # cur_threshold, cur_periodic_seg = generate_periodic_seg(index_seq[:prev_threshold])
+                cur_threshold, cur_periodic_seg = split_non_periodic_seg(index_seq[:prev_threshold])
                 if len(cur_periodic_seg) == 0:
                     non_periodic_res_index = [index_seq[:cur_threshold]] + non_periodic_res_index
                     cur_closed_form = self.solve_periodic(index_seq[:cur_threshold])
                 else:
-                    non_periodic_res_index.append(cur_periodic_seg)
+                    # non_periodic_res_index.append(cur_periodic_seg)
+                    non_periodic_res_index = [cur_periodic_seg] + non_periodic_res_index
                     cur_closed_form = self.solve_periodic(cur_periodic_seg)
                 if len(cur_periodic_seg) == 0:
                     cur_closed_form = [{v: closed_form[v].subs(values[0]) for v in closed_form} for closed_form in cur_closed_form]
@@ -236,7 +241,8 @@ class Recurrence:
                     break
                 else:
                     cur_closed_form = [{v: closed_form[v].subs(values[cur_threshold]) for v in closed_form} for closed_form in cur_closed_form]
-                    non_periodic_res.append((self.ind_var < smallest + threshold, cur_closed_form))
+                    # non_periodic_res.append((self.ind_var < smallest + threshold, cur_closed_form))
+                    non_periodic_res = [(self.ind_var < smallest + threshold, cur_closed_form)] + non_periodic_res
                 prev_threshold = cur_threshold
             res += non_periodic_res
             res_index_seq.extend(non_periodic_res_index)
@@ -371,8 +377,8 @@ class Recurrence:
         return ordered_vars, res
 
 def generate_periodic_seg(index_seq):
-    best_periodic_seg = []
-    best_threshold = 0
+    best_periodic_seg = [index_seq[-1]]
+    best_threshold = 1
     reversed_index_seq = list(reversed(index_seq))
     for i in range(1, len(index_seq)//2 + 1):
         candidate = reversed_index_seq[:i]
@@ -385,6 +391,14 @@ def generate_periodic_seg(index_seq):
         else:
             return 0, reversed_index_seq[j - i:j]
     return len(index_seq) - best_threshold, list(reversed(best_periodic_seg))
+
+def split_non_periodic_seg(index_seq):
+    if len(index_seq) == 2:
+        return len(index_seq) - 1, [index_seq[1]]
+    elif len(index_seq) == 1:
+        return 0, [index_seq[0]]
+    else:
+        return generate_periodic_seg(index_seq)
 
 def to_z3(sp_expr):
     self = sp.factor(sp_expr)
@@ -514,11 +528,14 @@ def solve_k(constraints, k):
             m = solver.model()
             eq = (m[k] == m.eval(template))
             eqs.append(eq)
-            solver.push()
-            var = random.choice(all_vars + [k])
-            solver.add(z3.Not(var == m[var]))
-            if solver.check() != z3.sat:
-                solver.pop()
+            while True:
+                solver.push()
+                var = random.choice(all_vars + [k])
+                solver.add(z3.Not(var == m[var]))
+                if solver.check() == z3.unsat:
+                    solver.pop()
+                else:
+                    break
             # solver.add(*[z3.Not(var == m[var]) for var in all_vars + [k]])
         linear_solver.add(*eqs)
         linear_solver.check()
