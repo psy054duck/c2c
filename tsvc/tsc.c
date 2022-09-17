@@ -3045,6 +3045,41 @@ int s275()
 	return 0;
 }
 
+int s275p()
+{
+
+//	control flow
+//	if around inner loop, interchanging needed
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s275 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
+		// for (int i = 0; i < LEN2; i++) {
+		// 	if (aa[0][i] > (float)0.) {
+		// 		for (int j = 1; j < LEN2; j++) {
+		// 			aa[j][i] = aa[j-1][i] + bb[j][i] * cc[j][i];
+		// 		}
+		// 	}
+		// }
+		for (int i = 1; i < LEN2; i++) {
+			for (int j = 0; j < LEN2; j++) {
+				if (aa[0][j] > 0)
+					aa[i][j] = aa[i-1][j] + bb[i][j] * cc[i][j];
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S275p\t %.2f \t\t", clock_dif_sec);;
+	check(11);
+	return 0;
+}
+
 int s2275()
 {
 
@@ -3068,6 +3103,35 @@ int s2275()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S2275\t %.2f \t\t", clock_dif_sec);;
+	check(11);
+	return 0;
+}
+
+int s2275p()
+{
+
+//	loop distribution is needed to be able to interchange
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s275 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 100*(ntimes/LEN2); nl++) {
+		for (int i = 0; i < LEN2; i++) {
+			for (int j = 0; j < LEN2; j++) {
+				aa[i][j] = aa[i][j] + bb[i][j] * cc[i][j];
+			}
+		}
+		for (int i = 0; i < LEN2; i++) {
+			a[i] = b[i] + c[i] * d[i];
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S2275p\t %.2f \t\t", clock_dif_sec);;
 	check(11);
 	return 0;
 }
@@ -5754,9 +5818,13 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	s256();
-	s256p();
-	s256pp();
+	s2275();
+	s2275p();
+	// s275();
+	// s275p();
+	// s256();
+	// s256p();
+	// s256pp();
 	// s231();
 	// s231p();
 	// s231pp();

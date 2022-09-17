@@ -11,6 +11,7 @@ tokens = (
     'LPAREN','RPAREN', 'LBRACK', 'RBRACK',
     'SEMI', 'ASSIGN',
     'GT', 'LT', 'GE', 'LE',
+    'AND', 'OR',
     ) + tuple(k.upper() for k in keywords)
 
 
@@ -34,6 +35,8 @@ t_LT = r'<'
 t_GT = r'>'
 t_LE = r'<='
 t_GE = r'>='
+t_AND = r'&&'
+t_OR = r'\|\|'
 
 t_ignore = ' \t'
 

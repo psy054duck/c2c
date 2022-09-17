@@ -31,7 +31,23 @@ def p_if_statement(p):
     p[0] = (p[3], p[6])
 
 def p_cond_1(p):
-    '''cond : atom_cond'''
+    '''cond : condo'''
+    p[0] = p[1]
+
+def p_condo_1(p):
+    '''condo : conda OR condo'''
+    p[0] = sp.Or(p[1], p[3])
+
+def p_condo_2(p):
+    '''condo : conda'''
+    p[0] = p[1]
+
+def p_conda_1(p):
+    '''conda : atom_cond AND conda'''
+    p[0] = sp.And(p[1], p[3])
+
+def p_conda_2(p):
+    '''conda : atom_cond'''
     p[0] = p[1]
 
 def p_atom_cond_1(p):
@@ -121,13 +137,13 @@ def p_error(p):
 parser = yacc.yacc()
 
 if __name__ == '__main__':
-    with open('test.txt') as fp:
+    with open('rec.txt') as fp:
         recurrence = parser.parse(fp.read())
         x = sp.Symbol('x', integer=True)
         y = sp.Symbol('y', integer=True)
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
-        res = recurrence.solve()
-        res.pp_print()
+        res = recurrence.solve_array()
+        # res.pp_print()
         # values = {x: -10, y: 10, Recurrence.inductive_var: 11}
         # print(res.eval(values))

@@ -16,7 +16,7 @@ class Recurrence:
         self.inits = inits
         self.conditions = [conditions[0]]
         for cond in conditions[1:]:
-            self.conditions.append(sp.And(sp.Not(self.conditions[-1]), cond))
+            self.conditions.append(sp.simplify(sp.And(sp.Not(self.conditions[-1]), cond)))
         self.transitions = transitions
         self._combine_branches()
         self.variables = reduce(set.union, [set(k for k in t.keys()) for t in transitions])
@@ -29,6 +29,23 @@ class Recurrence:
                     if var.name == t.name:
                         self.arity[var] = len(t.args)
                         break
+
+    def print(self):
+        for cond, tran in zip(self.conditions, self.transitions):
+            print(cond)
+            print('\t%s' % tran)
+
+    def to_file(self, filename):
+        with open(filename, 'w') as fp:
+            s = ''
+            for i, (cond, trans) in enumerate(zip(self.conditions, self.transitions)):
+                if i > 0:
+                    s += 'else '
+                s += 'if (%s) {\n' % cond
+                for k in trans:
+                    s += '\t%s = %s;\n' % (k, trans[k])
+                s += '} '
+            fp.write(s)
 
     def _combine_branches(self):
         new_conditions = []
@@ -71,9 +88,9 @@ class Recurrence:
         neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - Recurrence.neg_ind_var - 1}).to_sympy()
         new_conditions = [cond.subs(neg_scalar_closed_form_sp) for cond in self.conditions]
         new_rec = self._t_transitions(neg_scalar_closed_form_sp)
+        new_rec.to_file(filename='tmp.txt')
         res = new_rec.solve()
         res.pp_print()
-
 
     def extract_scalar_part(self):
         scalar_vars = {var for var in self.arity if self.arity[var] == 0}
@@ -121,12 +138,14 @@ class Recurrence:
             prev_closed_form = None
             prev_k = None
             prev_seq = None
+            all_initial_values = [self.inits]
             for i, (seq, k) in enumerate(zip(index_seq, ks)):
                 cur_closed_form = self.solve_periodic(seq)
                 cur_closed_form = self.periodic_closed_form2sympy(cur_closed_form)
                 if prev_closed_form is not None:
                     acc_k = sum(len(index_seq[j])*ks[j] for j in range(i))
                     init_values = {var: prev_closed_form[var].subs(self.ind_var, acc_k) for var in prev_closed_form}
+                    all_initial_values.append(init_values)
                     cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(self.ind_var, self.ind_var - acc_k) for var in cur_closed_form}
                 prev_closed_form = cur_closed_form
                 prev_k = k
@@ -137,6 +156,7 @@ class Recurrence:
             if prev_closed_form is not None:
                 acc_k = sum(len(index_seq[j])*ks[j] for j in range(len(ks)))
                 init_values = {var: prev_closed_form[var].subs(self.ind_var, acc_k) for var in prev_closed_form}
+                all_initial_values.append(init_values)
                 # init_values = {var: prev_closed_form[var].subs(self.ind_var, len(prev_seq)*prev_k) for var in prev_closed_form}
                 cur_closed_form = {var: cur_closed_form[var].subs(init_values).subs(self.ind_var, self.ind_var - acc_k) for var in cur_closed_form}
             closed_forms.append(cur_closed_form)
@@ -162,8 +182,10 @@ class Recurrence:
                     shifted_ind_var = len(seq)*z3_ind_var + j
                     shifted_closed_form = {to_z3(var): z3.substitute(to_z3(cur_closed_form[var]), (z3_ind_var, shifted_ind_var)) for var in cur_closed_form}
                     validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
-                    validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= shifted_ind_var, shifted_ind_var < len(seq)*k), validation_cond))
+                    validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(1 <= shifted_ind_var, shifted_ind_var < len(seq)*k), validation_cond))
                     validation_conditions = z3.And(validation_conditions, validation_cond, k >= 1)
+                # validation_conditions = z3.And(to_z3(self.conditions[seq[0]].subs(all_initial_values[i], simultaneous=True)))
+                validation_conditions = z3.And(validation_conditions, (z3.substitute(to_z3(self.conditions[seq[0]]), *[(to_z3(var), to_z3(init)) for var, init in all_initial_values[i].items()])))
             # prev_k = z3_ks[-1] if len(z3_ks) > 0 else 0
             if len(z3_ks) > 0:
                 acc_k = sum(len(index_seq[j])*ks[j] for j in range(i))
@@ -175,15 +197,19 @@ class Recurrence:
                 shifted_ind_var = len(seq)*self.ind_var + j
                 shifted_closed_form = {to_z3(var): to_z3(cur_closed_form[var].subs(self.ind_var, shifted_ind_var)) for var in cur_closed_form}
                 validation_cond = z3.substitute(to_z3(self.conditions[s]), *[(var, shifted_closed_form[var]) for var in shifted_closed_form])
-                validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(0 <= to_z3(shifted_ind_var)), validation_cond))
+                validation_cond = z3.ForAll(z3_ind_var, z3.Implies(z3.And(1 <= to_z3(shifted_ind_var)), validation_cond))
                 validation_conditions = z3.And(validation_conditions, validation_cond)
+            validation_conditions = z3.And(validation_conditions, to_z3(self.conditions[seq[0]].subs(all_initial_values[-1], simultaneous=True)))
             cnf = z3_qe(z3.simplify(validation_conditions))[0]
+            print(cur_initals)
+            print(index_seq)
+            print(validation_conditions)
+            print(cnf)
 
             res_ks = [solve_k(cnf, k) for k in z3_ks]
             constraint = [z3.substitute(c, *[(k, v) for k, v in zip(z3_ks, res_ks)]) for c in cnf]
             constraint = [z3.substitute(c, *[(to_z3(var), to_z3(self.inits[var])) for var in self.inits]) for c in constraint]
             constraint = z3.simplify(z3.And(*constraint))
-            sim = z3.Tactic('ctx-solver-simplify')
             solver.add(z3.Not(constraint))
             subs_pairs1 = {k: to_sympy(k_z3) for k, k_z3 in zip(ks, res_ks)}
             subs_pairs2 = {var: self.inits[var] for var in self.inits}
@@ -192,7 +218,6 @@ class Recurrence:
                 closed_forms[i] = closed_form
             res_ks_sympy = [sp.simplify(subs_pairs1[var].subs(subs_pairs2, simultaneous=True)) for var in ks]
             tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy, index_seq))
-        # res = Closed_form(tot_closed_form, self.ind_var)
         res = self._tot_closed_form2class(tot_closed_form)
         return res
         
