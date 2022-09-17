@@ -9,7 +9,8 @@ class Closed_form:
     def pp_print(self):
         for cond, closed_form in zip(self.conditions, self.closed_forms):
             for var in closed_form:
-                print('%s = %s\t%s' % (var, closed_form[var], cond))
+                print('{:<100}{}'.format('%s = %s' % (var, closed_form[var]), cond))
+                # print('%s = %s\t%s' % (var, closed_form[var], cond))
 
     def subs(self, subs_dict):
         new_conditions = [cond.subs(subs_dict, simultaneous=True) for cond in self.conditions]
