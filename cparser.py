@@ -158,7 +158,8 @@ def for2rec(init, nex, body, filename=None):
         pass
     else:
         with open(filename, 'w') as fp:
-            s = 'if (%s) {\n' % conds[0]
+            s = ''.join('%s = %s;\n' % (var, info['init']) for var, info in init)
+            s += 'if (%s) {\n' % conds[0]
             s += '%s\n' % _transform_stmt(stmts[0])
             s += '} '
             for cond, stmt in zip(conds[1:], stmts[1:]):
