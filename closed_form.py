@@ -12,7 +12,7 @@ class Closed_form:
     def pp_print(self):
         for cond, closed_form in zip(self.conditions, self.closed_forms):
             for var in closed_form:
-                print('{:<100}{}'.format('%s = %s' % (var, closed_form[var]), cond))
+                print('{:<100}{}'.format('%s = %s' % (var, sp.refine(closed_form[var], cond)), cond))
                 # print('%s = %s\t%s' % (var, closed_form[var], cond))
 
     def subs(self, subs_dict):
@@ -34,7 +34,7 @@ class Closed_form:
         new_conditions = []
         for closed, cond in zip(self.closed_forms, self.conditions):
             if cond:
-                new_closed_forms.append(closed)
+                new_closed_forms.append(sp.refine(closed, cond))
                 new_conditions.append(cond)
         self.closed_forms = new_closed_forms
         self.conditions = new_conditions

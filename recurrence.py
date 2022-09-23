@@ -130,7 +130,8 @@ class Recurrence:
             for app in t_trans:
                 cond_arr = sp.And(*[sp.Eq(t, arg.subs(scalar_closed_form)) for t, arg in zip(t_list, app.args)])
                 new_conditions.append(sp.simplify(sp.And(cond.subs(scalar_closed_form), cond_arr)))
-                new_trans = {t: arg.subs(scalar_closed_form, simultaneous=True) for arg, t in zip(t_trans[app].args, t_list)}
+                new_trans = {t: self._expr2involving_t(t, arg1, arg2).subs(scalar_closed_form, simultaneous=True) for arg1, arg2, t in zip(app.args, t_trans[app].args, t_list)}
+                # new_trans = {t: t - 1 for arg, t in zip(t_trans[app].args, t_list)}
                 transitions.append(new_trans | {d: d + 1, acc: acc + acc_terms[app]})
                 # transitions.append(new_trans | {d: d + 1})
         new_conditions.append(sp.simplify(sp.Not(sp.Or(*[cond for cond in new_conditions]))))
@@ -138,6 +139,19 @@ class Recurrence:
         # transitions.append({t: t for t in t_list} | {d: d + 1})
         return Recurrence({d: 0, acc: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list
         # return Recurrence({d: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list
+
+    def _expr2involving_t(self, t, t_expr, expr):
+        '''if t = t_expr, then make expr to be an equivalent expression involving t'''
+        vars = t_expr.free_symbols
+        vars_p = expr.free_symbols
+        intersec_vars = vars.intersection(vars_p)
+        if len(intersec_vars) == 0:
+            return expr
+        var = list(intersec_vars)[0]
+        sol = sp.solve(t - t_expr, var, dict=True)
+        assert(len(sol) == 1)
+        res = expr.subs(sol[0])
+        return res
 
     def solve(self):
         solver = z3.Solver()
@@ -388,7 +402,8 @@ class Recurrence:
         matrix_closed_form = (P*middle*P.inv()).subs(0**ind_var, 0)
         linear_form = Recurrence.matrix2linear(ordered_vars, matrix_closed_form)
         if matrix_form.rank() != matrix_form.shape[0]:
-            linear_form = {var: sp.Piecewise((var, sp.Eq(ind_var, 0)), (linear_form[var], True)) for var in linear_form}
+            linear_form = {var: sp.Piecewise((var, sp.Eq(ind_var, 0)), (linear_form[var], True)) if linear_form[var].subs(ind_var, 0) != var else linear_form[var] for var in linear_form}
+            # linear_form = {var: sp.Piecewise((var, sp.Eq(ind_var, 0)), (linear_form[var], True)) for var in linear_form}
         return linear_form
 
 
