@@ -1,10 +1,13 @@
 import sympy as sp
+import z3
+from utils import to_z3, to_sympy
 
 class Closed_form:
     def __init__(self, conditions, closed_forms, ind_var):
         self.conditions = [sp.S.true] if len(conditions) == 1 else conditions
         self.closed_forms = closed_forms
         self.ind_var = ind_var
+        self._simplify_conditions()
 
     def pp_print(self):
         for cond, closed_form in zip(self.conditions, self.closed_forms):
@@ -17,8 +20,30 @@ class Closed_form:
         new_closed_forms = [{var: closed[var].subs(subs_dict, simultaneous=True) for var in closed} for closed in self.closed_forms]
         return Closed_form(new_conditions, new_closed_forms, self.ind_var)
 
+    def add_constraint(self, constraint):
+        self.conditions = [sp.simplify(sp.And(cond, constraint)) for cond in self.conditions]
+        self._simplify_conditions()
+
+    def _simplify_conditions(self):
+        sim = z3.Tactic('ctx-solver-simplify')
+        for i in range(len(self.conditions)):
+            z3_cond = z3.And(z3.BoolVal(True), *(sim(to_z3(self.conditions[i]))[0]))
+            new_cond = to_sympy(z3_cond)
+            self.conditions[i] = new_cond
+        new_closed_forms = []
+        new_conditions = []
+        for closed, cond in zip(self.closed_forms, self.conditions):
+            if cond:
+                new_closed_forms.append(closed)
+                new_conditions.append(cond)
+        self.closed_forms = new_closed_forms
+        self.conditions = new_conditions
+
     def set_ind_var(self, ind_var):
         self.ind_var = ind_var
+
+    def get_ind_var(self):
+        return self.inv_var
 
     def to_sympy(self):
         res_tmp = {}

@@ -5,6 +5,7 @@ import sympy as sp
 from sympy.logic.boolalg import Boolean, true, false
 import z3
 from closed_form import Closed_form
+from utils import to_z3, to_sympy, get_app_by_var
 
 class Recurrence:
 
@@ -87,14 +88,18 @@ class Recurrence:
 
     def solve_array(self):
         # t_list = self._prepare_t()
+        print(self.conditions)
         scalar_rec = self.to_scalar()
         scalar_closed_form = scalar_rec.solve()
         neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - Recurrence.neg_ind_var - 1}).to_sympy()
         new_conditions = [cond.subs(neg_scalar_closed_form_sp) for cond in self.conditions]
-        new_rec = self._t_transitions(neg_scalar_closed_form_sp)
+        new_rec, t_list = self._t_transitions(neg_scalar_closed_form_sp)
         # new_rec.add_constraint(to_z3(self.ind_var >= 0))
         new_rec.to_file(filename='tmp.txt')
         res = new_rec.solve()
+        res = res.subs({res.ind_var: self.ind_var})
+        res.add_constraint(sp.And(*[t >= 0 for t in t_list]))
+        # res = res.subs({t: t >= 0 for t in t_list})
         res.pp_print()
 
     def extract_scalar_part(self):
@@ -114,20 +119,25 @@ class Recurrence:
 
     def _t_transitions(self, scalar_closed_form):
         t_list = self._prepare_t()
+        acc = sp.Symbol('_acc', integer=True)
         transitions = []
         new_conditions = []
         d = sp.Symbol('d_p', integer=True)
         scalar_closed_form = {var: scalar_closed_form[var].subs(Recurrence.neg_ind_var, d) for var in scalar_closed_form}
         for cond, trans in zip(self.conditions, self.transitions):
-            array_trans = {var: trans[var] for var in trans if self.arity.get(var, 0) >= 1}
-            for app in array_trans:
+            t_trans = {var: get_app_by_var(var.func, trans[var]) for var in trans if self.arity.get(var, 0) >= 1}
+            acc_terms = {var: trans[var] - t_trans[var] for var in t_trans}
+            for app in t_trans:
                 cond_arr = sp.And(*[sp.Eq(t, arg.subs(scalar_closed_form)) for t, arg in zip(t_list, app.args)])
                 new_conditions.append(sp.simplify(sp.And(cond.subs(scalar_closed_form), cond_arr)))
-                new_trans = {t: arg.subs(scalar_closed_form, simultaneous=True) for arg, t in zip(app.args, t_list)}
-                transitions.append(new_trans | {d: d + 1})
+                new_trans = {t: arg.subs(scalar_closed_form, simultaneous=True) for arg, t in zip(t_trans[app].args, t_list)}
+                transitions.append(new_trans | {d: d + 1, acc: acc + acc_terms[app]})
+                # transitions.append(new_trans | {d: d + 1})
         new_conditions.append(sp.simplify(sp.Not(sp.Or(*[cond for cond in new_conditions]))))
-        transitions.append({t: t for t in t_list} | {d: d + 1})
-        return Recurrence({d: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var)
+        transitions.append({t: t for t in t_list} | {d: d + 1, acc: acc})
+        # transitions.append({t: t for t in t_list} | {d: d + 1})
+        return Recurrence({d: 0, acc: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list
+        # return Recurrence({d: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list
 
     def solve(self):
         solver = z3.Solver()
@@ -430,113 +440,8 @@ def split_non_periodic_seg(index_seq):
     else:
         return generate_periodic_seg(index_seq)
 
-def to_z3(sp_expr):
-    self = sp.factor(sp_expr)
-    if isinstance(self, sp.Add):
-        res = sum([to_z3(arg) for arg in self.args])
-    elif isinstance(self, sp.Mul):
-        res = 1
-        for arg in reversed(self.args):
-            if arg.is_number and not arg.is_Integer:
-                res = (res*arg.numerator)/arg.denominator
-            else:
-                res = res * to_z3(arg)
-        return z3.simplify(res)
-        # return reduce(lambda x, y: x*y, [to_z3(arg) for arg in reversed(self.args)])
-    elif isinstance(self, sp.Piecewise):
-        if len(self.args) == 1:
-            res = to_z3(self.args[0][0])
-        else:
-            cond  = to_z3(self.args[0][1])
-            res = z3.If(cond, to_z3(self.args[0][0]), to_z3(self.args[1][0]))
-    elif isinstance(self, sp.And):
-        res = z3.And(*[to_z3(arg) for arg in self.args])
-    elif isinstance(self, sp.Or):
-        res = z3.Or(*[to_z3(arg) for arg in self.args])
-    elif isinstance(self, sp.Not):
-        res = z3.Not(*[to_z3(arg) for arg in self.args])
-    elif isinstance(self, sp.Gt):
-        res = to_z3(self.lhs) > to_z3(self.rhs)
-    elif isinstance(self, sp.Ge):
-        res = to_z3(self.lhs) >= to_z3(self.rhs)
-    elif isinstance(self, sp.Lt):
-        res = to_z3(self.lhs) < to_z3(self.rhs)
-    elif isinstance(self, sp.Le):
-        res = to_z3(self.lhs) <= to_z3(self.rhs)
-    elif isinstance(self, sp.Eq):
-        res = to_z3(self.lhs) == to_z3(self.rhs)
-    elif isinstance(self, sp.Ne):
-        res = to_z3(self.lhs) != to_z3(self.rhs)
-    elif isinstance(self, sp.Integer) or isinstance(self, int):
-        res = z3.IntVal(int(self))
-    elif isinstance(self, sp.Symbol):
-        res = z3.Int(str(self))
-    elif isinstance(self, sp.Rational):
-        # return z3.RatVal(self.numerator, self.denominator)
-        res = z3.IntVal(self.numerator) / z3.IntVal(self.denominator)
-    elif isinstance(self, sp.Pow):
-        if self.base == 0: res = z3.IntVal(0)
-        else: raise Exception('%s' % self)
-    elif isinstance(self, sp.Mod):
-        res = to_z3(self.args[0]) % to_z3(self.args[1])
-    elif self is true:
-        res = z3.BoolVal(True)
-    elif self is false:
-        res = z3.BoolVal(False)
-    else:
-        raise Exception('Conversion for "%s" has not been implemented yet' % type(self))
-    return z3.simplify(res)
 
-def to_sympy(expr):
-    if z3.is_int_value(expr):
-        res = expr.as_long()
-    elif z3.is_const(expr) and z3.is_bool(expr):
-        res = sp.S.true if z3.is_true(expr) else sp.S.false
-    elif z3.is_const(expr):
-        res = sp.Symbol(str(expr), integer=True)
-    elif z3.is_add(expr):
-        res = sum([to_sympy(arg) for arg in expr.children()])
-    elif z3.is_sub(expr):
-        children = expr.children()
-        assert(len(children) == 2)
-        res = to_sympy(children[0]) - to_sympy(children[1])
-    elif z3.is_mul(expr):
-        children = expr.children()
-        res = reduce(lambda x, y: x*y, [to_sympy(ch) for ch in children])
-    elif z3.is_mod(expr):
-        children = expr.children()
-        res = to_sympy(children[0]) % to_sympy(children[1])
-    elif z3.is_gt(expr):
-        children = expr.children()
-        res = to_sympy(children[0]) > to_sympy(children[1])
-    elif z3.is_lt(expr):
-        children = expr.children()
-        res = to_sympy(children[0]) < to_sympy(children[1])
-    elif z3.is_ge(expr):
-        children = expr.children()
-        res = to_sympy(children[0]) >= to_sympy(children[1])
-    elif z3.is_le(expr):
-        children = expr.children()
-        res = to_sympy(children[0]) <= to_sympy(children[1])
-    elif z3.is_eq(expr):
-        children = expr.children()
-        res = sp.Eq(to_sympy(children[0]), to_sympy(children[1]))
-    elif z3.is_not(expr):
-        children = expr.children()
-        res = sp.Not(to_sympy(children[0]))
-    elif z3.is_and(expr):
-        children = expr.children()
-        res = sp.And(*[to_sympy(ch) for ch in children])
-    elif z3.is_or(expr):
-        children = expr.children()
-        res = sp.Or(*[to_sympy(ch) for ch in children])
-    elif len(expr.children()) == 3 and z3.is_bool(expr.children()[0]):
-        children = expr.children()
-        cond = to_sympy(children[0])
-        res = sp.Piecewise((to_sympy(children[1]), cond), (to_sympy(children[2]), sp.S.true))
-    else:
-        raise Exception('conversion for type "%s" is not implemented: %s' % (type(expr), expr))
-    return sp.simplify(res)
+
 
 def my_simplify_sp(expr):
     return sp.simplify(expr)
