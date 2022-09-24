@@ -145,6 +145,12 @@ class Vectorizer:
             res.append(self.visit(p))
         return res
 
+    def visit_Typedef(self, node):
+        return node
+
+    def visit_FuncCall(self, node):
+        return node
+
     def visit_NoneType(self, node):
         '''A special visitor for None'''
         return None
@@ -210,7 +216,8 @@ def flat_body(body):
 
 if __name__ == '__main__':
     # c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10')
-    c_ast = parse_file('test.c', use_cpp=True)
+    # c_ast = parse_file('test.c', use_cpp=True)
+    c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()

@@ -3,6 +3,18 @@ from sympy.logic.boolalg import true, false
 import z3
 from functools import reduce
 
+def z3_deep_simplify(expr):
+    # print(expr)
+    sim = z3.Tactic('ctx-solver-simplify')
+    cond_list = list(sim(expr)[0])
+    # print(cond_list)
+    if len(cond_list) == 0:
+        return z3.BoolVal(True)
+    elif len(cond_list) == 1:
+        return cond_list[0]
+    else:
+        return z3.And(*[z3_deep_simplify(cond) for cond in cond_list])
+
 def to_z3(sp_expr):
     self = sp.factor(sp_expr)
     if isinstance(self, sp.Add):

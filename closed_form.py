@@ -1,18 +1,18 @@
 import sympy as sp
 import z3
-from utils import to_z3, to_sympy
+from utils import to_z3, to_sympy, z3_deep_simplify
 
 class Closed_form:
     def __init__(self, conditions, closed_forms, ind_var):
         self.conditions = [sp.S.true] if len(conditions) == 1 else conditions
         self.closed_forms = closed_forms
         self.ind_var = ind_var
-        self._simplify_conditions()
+        # self._simplify_conditions()
 
     def pp_print(self):
         for cond, closed_form in zip(self.conditions, self.closed_forms):
             for var in closed_form:
-                print('{:<100}{}'.format('%s = %s' % (var, sp.refine(closed_form[var], cond)), cond))
+                print('{:<100}{}'.format('%s = %s' % (var, closed_form[var]), cond))
                 # print('%s = %s\t%s' % (var, closed_form[var], cond))
 
     def subs(self, subs_dict):
@@ -22,13 +22,14 @@ class Closed_form:
 
     def add_constraint(self, constraint):
         self.conditions = [sp.simplify(sp.And(cond, constraint)) for cond in self.conditions]
-        self._simplify_conditions()
+        # self._simplify_conditions()
 
     def _simplify_conditions(self):
         sim = z3.Tactic('ctx-solver-simplify')
         for i in range(len(self.conditions)):
             # z3_cond = z3.And(z3.BoolVal(True), *(sim(to_z3(self.conditions[i]))[0]))
-            z3_cond_list = list(sim(to_z3(self.conditions[i]))[0])
+            deep_simplified_cond = z3_deep_simplify(to_z3(self.conditions[i]))
+            z3_cond_list = list(sim(deep_simplified_cond)[0])
             remain_indicator = [True] * len(z3_cond_list)
             indicator = set()
             for j, cond in enumerate(z3_cond_list):
@@ -52,6 +53,35 @@ class Closed_form:
                 new_conditions.append(cond)
         self.closed_forms = new_closed_forms
         self.conditions = new_conditions
+
+        new_closed_forms = []
+        new_conditions = []
+        merged = set()
+        for i in range(len(self.conditions)):
+            if i in merged: continue
+            cur_closed_form = self.closed_forms[i]
+            cur_condition = self.conditions[i]
+            for j in range(len(self.conditions)):
+                if j in merged or i == j: continue
+                s = z3.Solver()
+                for var in self.closed_forms[i]:
+                    s.add(to_z3(self.conditions[j]))
+                    s.push()
+                    s.add(to_z3(self.closed_forms[i][var]) != to_z3(self.closed_forms[j][var]))
+                    if s.check() == z3.sat:
+                        break
+                    s.pop()
+                else:
+                    # new_closed_forms.append(self.closed_forms[i])
+                    # new_conditions.append(z3.Or(self.conditions[i], self.conditions[j]))
+                    cur_condition = to_sympy(z3_deep_simplify(z3.And(z3.BoolVal(True), *sim(to_z3(sp.Or(cur_condition, self.conditions[j])))[0])))
+                    merged.add(j)
+            new_closed_forms.append(cur_closed_form)
+            new_conditions.append(cur_condition)
+        self.closed_forms = new_closed_forms
+        self.conditions = new_conditions
+        if len(merged) != 0:
+            self._simplify_conditions()
 
     def set_ind_var(self, ind_var):
         self.ind_var = ind_var

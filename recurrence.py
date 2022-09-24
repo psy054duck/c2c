@@ -97,10 +97,11 @@ class Recurrence:
         # new_rec.to_file(filename='tmp.txt')
         res = new_rec.solve()
         res = res.subs({res.ind_var: self.ind_var})
-        mid = sp.Symbol('mid', integer=True)
-        res.add_constraint(sp.And(*[sp.And(t >= 0, t < 6400) for t in t_list]))
-        res = res.subs({self.ind_var: 6400, mid: 3200})
-        res.pp_print()
+        # mid = sp.Symbol('mid', integer=True)
+        # res.add_constraint(sp.And(*[sp.And(t >= 0, t < 16400) for t in t_list]))
+        # res = res.subs({self.ind_var: 800})
+        # res._simplify_conditions()
+        # res.pp_print()
 
     def extract_scalar_part(self):
         scalar_vars = {var for var in self.arity if self.arity[var] == 0}
@@ -162,6 +163,7 @@ class Recurrence:
             m = solver.model()
             cur_initals = {var: m.eval(z3.Int(str(var)), model_completion=True).as_long() for var in self.variables}
             _, index_seq = self.solve_with_inits(cur_initals)
+            print(index_seq)
             ks = [sp.Symbol('_k%d' % i, integer=True) for i in range(len(index_seq) - 1)]
             closed_forms = []
             prev_closed_form = None
