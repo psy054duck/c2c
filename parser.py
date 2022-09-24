@@ -1,3 +1,4 @@
+from array import array
 import sympy as sp
 import ply.yacc as yacc
 from lexer import lexer, tokens
@@ -143,7 +144,14 @@ if __name__ == '__main__':
         y = sp.Symbol('y', integer=True)
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
-        res = recurrence.solve_array()
+        scalar_closed_form, array_closed_form = recurrence.solve_array()
+        scalar_closed_form.pp_print()
+        for t in array_closed_form.bounded_vars:
+            array_closed_form.add_constraint(t < 6400)
+        array_closed_form = array_closed_form.subs({array_closed_form.ind_var: 6400})
+        array_closed_form._simplify_conditions()
+        array_closed_form.to_c()
+        # array_closed_form.pp_print()
         # res.pp_print()
         # values = {x: -10, y: 10, Recurrence.inductive_var: 11}
         # print(res.eval(values))

@@ -103,7 +103,11 @@ class Vectorizer:
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
-        for2rec(init, nex, stmt, filename='rec.txt')
+        try:
+            for2rec(init, nex, stmt, filename='rec.txt')
+        except:
+            pass
+        return node
     
     def visit_If(self, node):
         cond = self.visit(node.cond)
@@ -215,10 +219,10 @@ def flat_body(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    # c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10')
+    c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
-    c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
+    # c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
-    generator.visit(new_ast)
+    # print(generator.visit(new_ast))

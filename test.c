@@ -13,6 +13,7 @@ int test1() {
                 a[i] = a[i] + 2;
             }
         }
+        printf("\n");
     }
     printf("%f\n", 1.0*(clock() - start)/CLOCKS_PER_SEC);
     return a[N-1];

@@ -14,7 +14,6 @@ class Recurrence:
 
     def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]], ind_var=sp.Symbol('_n', integer=True)):
         self.ind_var = ind_var
-        self.inits = inits
         self.conditions = [conditions[0]]
         for cond in conditions[1:]:
             self.conditions.append(sp.simplify(sp.And(sp.Not(self.conditions[-1]), cond)))
@@ -22,6 +21,7 @@ class Recurrence:
         self._combine_branches()
         self.variables = reduce(set.union, [set(k for k in t.keys()) for t in transitions])
         self.variables = self.variables.union(reduce(set.union, [cond.free_symbols for cond in self.conditions]))
+        self.inits = {var: inits[var] for var in inits if var in self.variables}
         # self.variables = self.variables - {self.ind_var}
         self.arity = {}
         for var in self.variables:
@@ -92,16 +92,25 @@ class Recurrence:
         scalar_closed_form = scalar_rec.solve()
         neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - Recurrence.neg_ind_var - 1}).to_sympy()
         new_conditions = [cond.subs(neg_scalar_closed_form_sp) for cond in self.conditions]
-        new_rec, t_list = self._t_transitions(neg_scalar_closed_form_sp)
+        new_rec, t_list, acc, array_var = self._t_transitions(neg_scalar_closed_form_sp)
+        array_func = array_var.func
         # new_rec.add_constraint(to_z3(self.ind_var >= 0))
         # new_rec.to_file(filename='tmp.txt')
-        res = new_rec.solve()
-        res = res.subs({res.ind_var: self.ind_var})
+        arr_part_closed_form = new_rec.solve()
+        arr_part_closed_form = arr_part_closed_form.subs({arr_part_closed_form.ind_var: self.ind_var})
         # mid = sp.Symbol('mid', integer=True)
-        # res.add_constraint(sp.And(*[sp.And(t >= 0, t < 16400) for t in t_list]))
+        arr_part_closed_form.add_constraint(sp.And(*[t >= 0 for t in t_list]))
         # res = res.subs({self.ind_var: 800})
-        # res._simplify_conditions()
-        # res.pp_print()
+        arr_part_closed_form._simplify_conditions()
+        array_closed_form = self._form_array_closed_form(arr_part_closed_form, array_func, t_list, acc)
+        return scalar_closed_form, array_closed_form
+
+    def _form_array_closed_form(self, part_closed_form, arr_var, t_list, acc):
+        arr_closed_forms = []
+        for closed in part_closed_form.closed_forms:
+            arr_app = arr_var(*[closed[t] for t in t_list]) + closed[acc]
+            arr_closed_forms.append({arr_var(*t_list): arr_app})
+        return Closed_form(part_closed_form.conditions, arr_closed_forms, self.ind_var, t_list)
 
     def extract_scalar_part(self):
         scalar_vars = {var for var in self.arity if self.arity[var] == 0}
@@ -116,10 +125,10 @@ class Recurrence:
     def _prepare_t(self):
         array_var = [var for var in self.arity if self.arity[var] >= 1][0] # assume there is only one array
         t_list = [sp.Symbol('_t%d' % i, integer=True) for i in range(self.arity[array_var])]
-        return t_list
+        return t_list, array_var
 
     def _t_transitions(self, scalar_closed_form):
-        t_list = self._prepare_t()
+        t_list, array_var = self._prepare_t()
         acc = sp.Symbol('_acc', integer=True)
         transitions = []
         new_conditions = []
@@ -138,7 +147,7 @@ class Recurrence:
         new_conditions.append(sp.simplify(sp.Not(sp.Or(*[cond for cond in new_conditions]))))
         transitions.append({t: t for t in t_list} | {d: d + 1, acc: acc})
         # transitions.append({t: t for t in t_list} | {d: d + 1})
-        return Recurrence({d: 0, acc: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list
+        return Recurrence({d: 0, acc: 0} | self.inits, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list, acc, array_var
         # return Recurrence({d: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list
 
     def _expr2involving_t(self, t, t_expr, expr):

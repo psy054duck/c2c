@@ -1,12 +1,15 @@
 import sympy as sp
 import z3
-from utils import to_z3, to_sympy, z3_deep_simplify
+from utils import to_z3, to_sympy, z3_deep_simplify, expr2c
+import pycparser.c_ast as c_ast
+from pycparser import c_generator
 
 class Closed_form:
-    def __init__(self, conditions, closed_forms, ind_var):
+    def __init__(self, conditions, closed_forms, ind_var, bounded_vars=None):
         self.conditions = [sp.S.true] if len(conditions) == 1 else conditions
         self.closed_forms = closed_forms
         self.ind_var = ind_var
+        self.bounded_vars = bounded_vars
         # self._simplify_conditions()
 
     def pp_print(self):
@@ -105,3 +108,46 @@ class Closed_form:
                     if values[self.ind_var] < k.subs(values):
                         return {var: closed_form[var].subs(values) for var in closed_form}
         raise Exception('fail')
+
+    def to_c(self):
+        self._reorder_conditions()
+        self.pp_print()
+        self.to_c_split()
+
+    def is_splitable(self):
+        try:
+            _ = [cond.as_set() for cond in self.conditions]
+            return True
+        except:
+            return False
+
+    def _reorder_conditions(self):
+        if self.is_splitable():
+            t = list(self.conditions[0].free_symbols)[0]
+            closed_forms_conditions = sorted(zip(self.closed_forms, self.conditions), key=lambda x: x[1].as_set().sup)
+            self.closed_forms = [cc[0] for cc in closed_forms_conditions]
+            self.conditions = [cc[1].as_set().as_relational(t) for cc in closed_forms_conditions]
+
+    def to_c_split(self):
+        for closed, cond in zip(self.closed_forms, self.conditions):
+            interval = cond.as_set()
+            left = interval.inf
+            right = interval.sup
+            if not interval.contains(left):
+                left = left + 1
+            if interval.contains(right):
+                right = right + 1
+
+            for var in closed:
+                if len(var.args) > 0:
+                    generator = c_generator.CGenerator()
+                    assert(len(var.args) == 1)
+                    t = var.args[0]
+                    decl = c_ast.Decl(str(t), None, None, None, None, c_ast.TypeDecl(str(t), [], None, c_ast.IdentifierType(['int'])), c_ast.Constant('int', str(left)), None)
+                    init = c_ast.DeclList([decl])
+                    cond = c_ast.BinaryOp('<', c_ast.ID(str(t)), c_ast.Constant('int', str(right)))
+                    nex = c_ast.UnaryOp('p++', c_ast.ID(str(t)))
+                    assignment = c_ast.Assignment('=', c_ast.ArrayRef(c_ast.ID(str(var.func)), c_ast.ID(str(t))), expr2c(closed[var]))
+                    stmt = c_ast.Compound([assignment])
+                    for_loop = c_ast.For(init, cond, nex, stmt)
+                    print(generator.visit(for_loop))

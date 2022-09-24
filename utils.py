@@ -1,7 +1,10 @@
+from ast import Constant
+from lib2to3.pgen2.pgen import generate_grammar
 import sympy as sp
 from sympy.logic.boolalg import true, false
 import z3
 from functools import reduce
+import pycparser.c_ast as ast
 
 def z3_deep_simplify(expr):
     # print(expr)
@@ -70,6 +73,11 @@ def to_z3(sp_expr):
         res = z3.BoolVal(True)
     elif self is false:
         res = z3.BoolVal(False)
+    elif self.is_Function:
+        func = self.func
+        args = self.args
+        z3_func = z3.Function(func.name, *([z3.IntSort()]*(len(args) + 1)))
+        res = z3_func(*[to_z3(arg) for arg in args])
     else:
         raise Exception('Conversion for "%s" has not been implemented yet: %s' % (type(self), self))
     return z3.simplify(res)
@@ -135,8 +143,33 @@ def get_app_by_var(var, expr):
             return res
     return None
 
+def expr2c(expr: sp.Expr):
+    if isinstance(expr, sp.Add):
+        assert(len(expr.args) == 2)
+        res = ast.BinaryOp('+', expr2c(expr.args[0]), expr2c(expr.args[1]))
+    elif isinstance(expr, sp.Mul):
+        assert(len(expr.args) == 2)
+        res = ast.BinaryOp('*', expr2c(expr.args[0]), expr2c(expr.args[1]))
+    elif isinstance(expr, sp.Integer) or isinstance(expr, int):
+        res = ast.Constant('int', str(expr))
+    elif expr.is_Function:
+        assert(len(expr.args) == 1)
+        arg = expr.args[0]
+        res = ast.ArrayRef(ast.ID(str(expr.func)), expr2c(arg))
+    elif isinstance(expr, sp.Symbol):
+        res = ast.ID(str(expr))
+    else:
+        raise Exception('conversion for type "%s" is not implemented: %s' % (type(expr), expr))
+    return res
+
+
+
 if __name__ == '__main__':
     a = sp.Function('a')
     i = sp.Symbol('i', integer=True)
-    e = 2*a(i+1) - 1
-    print(get_app_by_var(a, e))
+    e = 2*a(i+1) + 1
+    from pycparser import c_generator
+    generator = c_generator.CGenerator()
+    print(generator.visit(expr2c(e)))
+
+    # print(get_app_by_var(a, e))
