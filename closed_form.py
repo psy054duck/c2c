@@ -27,14 +27,28 @@ class Closed_form:
     def _simplify_conditions(self):
         sim = z3.Tactic('ctx-solver-simplify')
         for i in range(len(self.conditions)):
-            z3_cond = z3.And(z3.BoolVal(True), *(sim(to_z3(self.conditions[i]))[0]))
+            # z3_cond = z3.And(z3.BoolVal(True), *(sim(to_z3(self.conditions[i]))[0]))
+            z3_cond_list = list(sim(to_z3(self.conditions[i]))[0])
+            remain_indicator = [True] * len(z3_cond_list)
+            indicator = set()
+            for j, cond in enumerate(z3_cond_list):
+                s = z3.Solver()
+                # s.add(*(z3_cond_list[:j] + z3_cond_list[j+1:]))
+                s.add(*[c for k, c in enumerate(z3_cond_list) if k not in indicator.union({j})])
+                s.add(z3.Not(cond))
+                if s.check() == z3.unsat:
+                    indicator.add(j)
+                    remain_indicator.append(False)
+                else:
+                    remain_indicator.append(True)
+            z3_cond = z3.And(z3.BoolVal(True), *[cond for i, cond in enumerate(z3_cond_list) if i not in indicator])
             new_cond = to_sympy(z3_cond)
             self.conditions[i] = new_cond
         new_closed_forms = []
         new_conditions = []
         for closed, cond in zip(self.closed_forms, self.conditions):
-            if cond:
-                new_closed_forms.append(sp.refine(closed, cond))
+            if cond is not sp.S.false:
+                new_closed_forms.append(closed)
                 new_conditions.append(cond)
         self.closed_forms = new_closed_forms
         self.conditions = new_conditions

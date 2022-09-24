@@ -1132,6 +1132,38 @@ int s119()
 	return 0;
 }
 
+int s119p()
+{
+
+//	linear dependence testing
+//	no dependence - vectorizable
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+	
+
+	init("s119 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 200*(ntimes/(LEN2)); nl++) {
+		for (int i = 1; i < LEN2; i++) {
+			for (int j = 1; j < LEN2; j+=4) {
+				aa[i][j] = aa[i-1][j-1] + bb[i][j];
+				aa[i][j+1] = aa[i-1][j] + bb[i][j+1];
+				aa[i][j+2] = aa[i-1][j+1] + bb[i][j+2];
+				aa[i][j+3] = aa[i-1][j+2] + bb[i][j+3];
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif /1000000.0);
+	
+	
+	printf("S119p\t %.2f \t\t ", clock_dif_sec);
+	check(11);
+	return 0;
+}
+
 int s1119()
 {
 
@@ -1157,6 +1189,38 @@ int s1119()
 	
 	
 	printf("S1119\t %.2f \t\t ", clock_dif_sec);
+	check(11);
+	return 0;
+}
+
+int s1119p()
+{
+
+//	linear dependence testing
+//	no dependence - vectorizable
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+	
+
+	init("s119 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 200*(ntimes/(LEN2)); nl++) {
+		for (int i = 1; i < LEN2; i++) {
+			for (int j = 0; j < LEN2; j+=4) {
+				aa[i][j] = aa[i-1][j] + bb[i][j];
+				aa[i][j+1] = aa[i-1][j+1] + bb[i][j+1];
+				aa[i][j+2] = aa[i-1][j+2] + bb[i][j+2];
+				aa[i][j+3] = aa[i-1][j+3] + bb[i][j+3];
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif /1000000.0);
+	
+	
+	printf("S1119p\t %.2f \t\t ", clock_dif_sec);
 	check(11);
 	return 0;
 }
@@ -1190,6 +1254,33 @@ int s121()
 	return 0;
 }
 
+int s121p()
+{
+
+//	induction variable recognition
+//	loop with possible ambiguity because of scalar store
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s121 ");
+	start_t = clock();
+
+	int j;
+	for (int nl = 0; nl < 3*ntimes; nl++) {
+		for (int i = 0; i < LEN-1; i++) {
+			a[i] = a[i + 1] + b[i];
+		}
+		j = LEN - 1;
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S121p\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
 // %1.2
 
 int s122(int n1, int n3)
@@ -1218,6 +1309,39 @@ int s122(int n1, int n3)
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S122\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
+int s122p(int n1, int n3)
+{
+
+//	induction variable recognition
+//	variable lower and upper bound, and stride
+//	reverse data access and jump in data access
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s122 ");
+	start_t = clock();
+
+	int j, k;
+	for (int nl = 0; nl < ntimes; nl++) {
+		j = 1;
+		k = 0;
+		int cnt = 0;
+		for (int i = n1-1; i < LEN; i += n3) {
+			a[i] += b[LEN - (k + cnt + 1)];
+			cnt = cnt + 1;
+		}
+		k = k + cnt;
+
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S122p\t %.2f \t\t", clock_dif_sec);;
 	check(1);
 	return 0;
 }
@@ -1323,6 +1447,36 @@ int s125()
 	return 0;
 }
 
+int s125p()
+{
+
+//	induction variable recognition
+//	induction variable in two loops; collapsing possible
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s125 ");
+	start_t = clock();
+
+	int k;
+	for (int nl = 0; nl < 100*(ntimes/(LEN2)); nl++) {
+		// k = -1;
+		for (int i = 0; i < LEN2; i++) {
+			for (int j = 0; j < LEN2; j++) {
+				array[i*LEN2 + j] = aa[i][j] + bb[i][j] * cc[i][j];
+			}
+		}
+		k = LEN2 * LEN2 - 1;
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S125p\t %.2f \t\t", clock_dif_sec);;
+	check(0);
+	return 0;
+}
+
 // %1.2
 int s126()
 {
@@ -1355,6 +1509,70 @@ int s126()
 	return 0;
 }
 
+int s126p()
+{
+
+//	induction variable recognition
+//	induction variable in two loops; recurrence in inner loop
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s126 ");
+	start_t = clock();
+
+	int k;
+	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
+		for (int i = 0; i < LEN2; i++) {
+			for (int j = 1; j < LEN2; j++) {
+				bb[j][i] = bb[j-1][i] + array[i*LEN2 + j - 1] * cc[j][i];
+			}
+		}
+		k = 1 + LEN2 * LEN2;
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S126p\t %.2f \t\t", clock_dif_sec);;
+	check(22);
+	return 0;
+}
+
+int s126pp()
+{
+
+//	induction variable recognition
+//	induction variable in two loops; recurrence in inner loop
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s126 ");
+	start_t = clock();
+
+	int k;
+	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
+		// for (int i = 0; i < LEN2; i++) {
+		// 	for (int j = 1; j < LEN2; j++) {
+		// 		bb[j][i] = bb[j-1][i] + array[i*LEN2 + j - 1] * cc[j][i];
+		// 		// bb[j][i] = bb[0][i] + array[i*LEN2]
+		// 	}
+		// }
+		for (int i = 1; i < LEN2; i++) {
+			for (int j = 0; j < LEN2; j++) {
+				bb[i][j] = bb[i-1][j] + array[j*LEN2 + i - 1] * cc[i][j];
+			}
+		}
+		k = 1 + LEN2 * LEN2;
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S126pp\t %.2f \t\t", clock_dif_sec);;
+	check(22);
+	return 0;
+}
+
 // %1.2
 
 int s127()
@@ -1383,6 +1601,42 @@ int s127()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S127\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
+int s127p()
+{
+
+//	induction variable recognition
+//	induction variable with multiple increments
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s127 ");
+	start_t = clock();
+
+	int j;
+	for (int nl = 0; nl < 2*ntimes; nl++) {
+		for (int i = 0; i < LEN/2; i+=2) {
+			a[2*i] = b[i] + c[i] * d[i];
+			a[2*i + 1] = b[i] + d[i] * e[i];
+			a[2*i + 2] = b[i+1] + c[i+1] * d[i+1];
+			a[2*i + 3] = b[i+1] + d[i+1] * e[i+1];
+
+			// a[2*i + 4] = b[i+2] + c[i+2] * d[i+2];
+			// a[2*i + 5] = b[i+2] + d[i+2] * e[i+2];
+
+			// a[2*i + 6] = b[i+3] + c[i+3] * d[i+3];
+			// a[2*i + 7] = b[i+3] + d[i+3] * e[i+3];
+		}
+		j = (LEN/2)*2 - 1;
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S127p\t %.2f \t\t", clock_dif_sec);;
 	check(1);
 	return 0;
 }
@@ -1420,6 +1674,46 @@ int s128()
 	return 0;
 }
 
+int s128p()
+{
+
+//	induction variables
+//	coupled induction variables
+//	jump in data access
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s128 ");
+	start_t = clock();
+
+	int j, k;
+	for (int nl = 0; nl < 2*ntimes; nl++) {
+		// j = -1;
+		for (int i = 0; i < LEN/2; i+=4) {
+			a[i] = b[2*i + 1] - d[i];
+			b[2*i+1] = b[2*i+1] - d[i] + c[2*i+1];
+
+			a[i+1] = b[2*i + 3] - d[i+1];
+			b[2*i+3] = b[2*i + 3] - d[i+1] + c[2*i+3];
+
+			a[i+2] = b[2*i + 5] - d[i+2];
+			b[2*i+5] = b[2*i + 5] - d[i+2] + c[2*i+5];
+
+			a[i+3] = b[2*i + 7] - d[i+3];
+			b[2*i+7] = b[2*i + 7] - d[i+3] + c[2*i+7];
+		}
+		j = 2*(LEN/2);
+		k = 2*(LEN/2) - 1;
+		dummy(a, b, c, d, e, aa, bb, cc, 1.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S128p\t %.2f \t\t", clock_dif_sec);;
+	check(12);
+	return 0;
+}
+
 // %1.3
 
 int s131()
@@ -1443,6 +1737,37 @@ int s131()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S131\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
+int s131p()
+{
+//	global data flow analysis
+//	forward substitution
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s131 ");
+	start_t = clock();
+
+	int m  = 1;
+	for (int nl = 0; nl < 5*ntimes; nl++) {
+		for (int i = 0; i < LEN - 1 - (LEN - 1)%4; i+=4) {
+			a[i] = a[i + 1] + b[i];
+			a[i+1] = a[i + 2] + b[i+1];
+			a[i+2] = a[i + 3] + b[i+2];
+			a[i+3] = a[i + 4] + b[i+3];
+		}
+		for (int i = (LEN - 1) - (LEN-1)%4; i < LEN - 1; i++) {
+			a[i] = a[i+1] + b[i];
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S131p\t %.2f \t\t", clock_dif_sec);;
 	check(1);
 	return 0;
 }
@@ -1471,6 +1796,39 @@ int s132()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S132\t %.2f \t\t", clock_dif_sec);;
+	check(11);
+	return 0;
+}
+
+int s132p()
+{
+//	global data flow analysis
+//	loop with multiple dimension ambiguous subscripts
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+	init( "s132 ");
+	start_t = clock();
+
+	int m = 0;
+	int j = m;
+	int k = m+1;
+	for (int nl = 0; nl < 400*ntimes; nl++) {
+		for (int i= 0; i < (LEN2-1) - (LEN2-1)%4; i+=4) {
+			aa[0][i+1] = aa[1][i] + b[i+1] * c[1];
+			aa[0][i+2] = aa[1][i+1] + b[i+2] * c[1];
+			aa[0][i+3] = aa[1][i+2] + b[i+3] * c[1];
+			aa[0][i+4] = aa[1][i+3] + b[i+4] * c[1];
+		}
+		for (int i = (LEN2-1) - (LEN2-1)%4; i < LEN2-1; i++) {
+			aa[0][i+1] = aa[1][i] + b[i+1] * c[1];
+			// aa[0][i] = aa[1][i-1] + b[i] * c[1];
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S132p\t %.2f \t\t", clock_dif_sec);;
 	check(11);
 	return 0;
 }
@@ -1504,6 +1862,37 @@ int s141()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S141\t %.2f \t\t", clock_dif_sec);;
+	check(0);
+	return 0;
+}
+
+int s141p()
+{
+
+//	nonlinear dependence testing
+//	walk a row in a symmetric packed array
+//	element a(i,j) for (int j>i) stored in location j*(j-1)/2+i
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s141 ");
+	start_t = clock();
+
+	int k;
+	for (int nl = 0; nl < 200*(ntimes/LEN2); nl++) {
+		for (int i = 0; i < LEN2; i++) {
+			k = (i+1) * ((i+1) - 1) / 2 + (i+1)-1;
+			for (int j = i; j < LEN2; j++) {
+				array[k] += bb[j][i]; // array[k] = array[k] + bb[j][i]
+				k += j+1;             // k + (i+1)*n + n(n-1)/2
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S141p\t %.2f \t\t", clock_dif_sec);;
 	check(0);
 	return 0;
 }
@@ -1855,14 +2244,42 @@ int s211()
 
 	for (int nl = 0; nl < ntimes; nl++) {
 		for (int i = 1; i < LEN-1; i++) {
-			a[i] = b[i - 1] + c[i] * d[i];
-			b[i] = b[i + 1] - e[i] * d[i];
+			a[i] = b[i - 1] + c[i] * d[i]; // forall i >= 1. a[i] = b[i+1] - e[i] * d[i] + c[i] * d[i]
+			b[i] = b[i + 1] - e[i] * d[i]; // forall i >= 1. b[i] = b[i + 1] - e[i] * d[i]
 		}
 		dummy(a, b, c, d, e, aa, bb, cc, 0.);
 	}
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S211\t %.2f \t\t", clock_dif_sec);;
+	check(12);
+	return 0;
+}
+
+int s211p()
+{
+
+//	statement reordering
+//	statement reordering allows vectorization
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s211 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < ntimes; nl++) {
+		a[1] = b[0] + c[1] * d[1];
+		b[1] = b[2] - e[1] * d[1];
+		for (int i = 2; i < LEN-1; i++) {
+			b[i] = b[i + 1] - e[i] * d[i]; // forall i >= 1. b[i] = b[i + 1] - e[i] * d[i]
+			a[i] = b[i] + c[i] * d[i]; // forall i >= 1. a[i] = b[i+1] - e[i] * d[i] + c[i] * d[i]
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S211p\t %.2f \t\t", clock_dif_sec);;
 	check(12);
 	return 0;
 }
@@ -1960,12 +2377,30 @@ int s221p()
 	start_t = clock();
 
 	for (int nl = 0; nl < ntimes/2; nl++) {
-		for (int i = 1; i < LEN; i++) {
+		for (int i = 1; i < LEN; i+=4) {
 			a[i] += c[i] * d[i];
+			a[i+1] += c[i+1] * d[i+1];
+			a[i+2] += c[i+2] * d[i+2];
+			a[i+3] += c[i+3] * d[i+3];
 		}
 		for (int i = 1; i < LEN; i++) {
 			b[i] = b[i-1] + a[i] + d[i];
 		}
+
+		// for (int i = 1; i < LEN - LEN%4; i+=4) {
+		// 	a[i] += c[i] * d[i];
+		// 	a[i+1] += c[i+1] * d[i+1];
+		// 	a[i+2] += c[i+2] * d[i+2];
+		// 	a[i+3] += c[i+3] * d[i+3];
+		// 	b[i] = b[i-1] + a[i] + d[i];
+		// 	b[i+1] = b[i] + a[i+1] + d[i+1];
+		// 	b[i+2] = b[i+1] + a[i+2] + d[i+2];
+		// 	b[i+3] = b[i+2] + a[i+3] + d[i+3];
+		// }
+		// for (int i = LEN-LEN%4; i < LEN; i++) {
+		// 	a[i] += c[i] * d[i];
+		// 	b[i] = b[i-1] + a[i] + d[i];
+		// }
 		// for (int i = 1; i < LEN; i++) {
 		// 	a[i] += c[i] * d[i];
 		// 	b[i] = b[i - 1] + a[i] + d[i];
@@ -2028,6 +2463,31 @@ int s222()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S222\t %.2f \t\t", clock_dif_sec);;
+	check(12);
+	return 0;
+}
+
+int s222p()
+{
+
+//	loop distribution
+//	partial loop vectorizatio recurrence in middle
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s222 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < ntimes/2; nl++) {
+		for (int i = 1; i < LEN; i++) {
+			e[i] = e[i - 1] * e[i - 1];
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S222p\t %.2f \t\t", clock_dif_sec);;
 	check(12);
 	return 0;
 }
@@ -2247,6 +2707,38 @@ int s233()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S233\t %.2f \t\t", clock_dif_sec);;
+	check(1122);
+	return 0;
+}
+
+int s233p()
+{
+
+//	loop interchange
+//	interchanging with one of two inner loops
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s233 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 100*(ntimes/LEN2); nl++) {
+		for (int i = 1; i < LEN2; i++) {
+			for (int j = 1; j < LEN2; j++) {
+				// aa[j][i] = aa[j-1][i] + cc[j][i];
+				aa[i][j] = aa[i-1][j] + cc[i][j];
+			}
+			for (int j = 1; j < LEN2; j++) {
+				// bb[j][i] = bb[j][i-1] + cc[j][i];
+				bb[i][j] = bb[i][j-1] + cc[i][j];
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S233p\t %.2f \t\t", clock_dif_sec);;
 	check(1122);
 	return 0;
 }
@@ -3377,6 +3869,66 @@ int s2710( float x)
 	return 0;
 }
 
+int s2710p( float x)
+{
+
+//	control flow
+//	scalar and vector ifs
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s2710");
+	start_t = clock();
+
+	for (int nl = 0; nl < ntimes/2; nl++) {
+		// for (int i = 0; i < LEN; i++) {
+		// 	if (a[i] > b[i]) {
+		// 		a[i] += b[i] * d[i];
+		// 		if (LEN > 10) {
+		// 			c[i] += d[i] * d[i];
+		// 		} else {
+		// 			c[i] = d[i] * e[i] + (float)1.;
+		// 		}
+		// 	} else {
+		// 		b[i] = a[i] + e[i] * e[i];
+		// 		if (x > (float)0.) {
+		// 			c[i] = a[i] + d[i] * d[i];
+		// 		} else {
+		// 			c[i] += e[i] * e[i];
+		// 		}
+		// 	}
+		// }
+		if (x > (float)0.) {
+			for (int i = 0; i < LEN; i++) {
+				if (a[i] > b[i]) {
+					a[i] += b[i] * d[i];
+					c[i] += d[i] * d[i];
+				} else {
+					b[i] = a[i] + e[i] * e[i];
+					c[i] = a[i] + d[i] * d[i];
+				}
+			}
+		} else {
+			for (int i = 0; i < LEN; i++) {
+				if (a[i] > b[i]) {
+					a[i] += b[i] * d[i];
+					c[i] += d[i] * d[i];
+				} else {
+					b[i] = a[i] + e[i] * e[i];
+					c[i] += e[i] * e[i];
+				}
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S2710p\t %.2f \t\t", clock_dif_sec);;
+	check(123);
+	return 0;
+}
+
 // %2.7
 
 int s2711()
@@ -3637,6 +4189,34 @@ int s2102()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S2102\t %.2f \t\t", clock_dif_sec);;
+	check(11);
+	return 0;
+}
+
+int s2102p()
+{
+
+//	diagonals
+//	identity matrix, best results vectorize both inner and outer loops
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s2102");
+	start_t = clock();
+
+	for (int nl = 0; nl < 100*(ntimes/LEN2); nl++) {
+		for (int i = 0; i < LEN2; i++) {
+			for (int j = 0; j < LEN2; j++) {
+				aa[i][j] = (float)0.;
+			}
+			aa[i][i] = (float)1.;
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S2102p\t %.2f \t\t", clock_dif_sec);;
 	check(11);
 	return 0;
 }
@@ -4583,6 +5163,32 @@ int s351()
 	return 0;
 }
 
+int s351p()
+{
+
+//	loop rerolling
+//	unrolled saxpy
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+	start_t = clock();
+
+	init( "s351 ");
+	start_t = clock();
+
+	float alpha = c[0];
+	for (int nl = 0; nl < 8*ntimes; nl++) {
+		for (int i = 0; i < LEN; i += 1) {
+			a[i] += alpha * b[i];
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S351p\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
 int s1351()
 {
 
@@ -4639,6 +5245,38 @@ int s352()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S352\t %.2f \t\t", clock_dif_sec);;
+	temp = dot;
+	check(-1);
+	return 0;
+}
+
+int s352p()
+{
+
+//	loop rerolling
+//	unrolled dot product
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+	start_t = clock();
+
+	init( "s352 ");
+	start_t = clock();
+
+	float dot;
+	for (int nl = 0; nl < 8*ntimes; nl++) {
+		dot = (float)0.;
+		for (int i = 0; i < LEN; i += 4) {
+			float dot1 = a[i] * b[i];
+			float dot2 = a[i+1] * b[i+1];
+			float dot3 = a[i+2] * b[i+2];
+			float dot4 = a[i+3] * b[i+3];
+			dot = dot + dot1 + dot2 + dot3 + dot4;
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, dot);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S352p\t %.2f \t\t", clock_dif_sec);;
 	temp = dot;
 	check(-1);
 	return 0;
@@ -5069,6 +5707,32 @@ int s453()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S453\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
+int s453p()
+{
+
+//	induction varibale recognition
+
+	float s;
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s453 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < ntimes*2; nl++) {
+		for (int i = 0; i < LEN; i++) {
+			a[i] = 2*(i + 1) * b[i];
+		}
+		s = 2 * LEN;
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S453p\t %.2f \t\t", clock_dif_sec);;
 	check(1);
 	return 0;
 }
@@ -5818,8 +6482,37 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	s2275();
-	s2275p();
+	s233();
+	s233p();
+	// s222();
+	// s222p();
+	// s221();
+	// s221p();
+	// s132();
+	// s132p();
+	// s128();
+	// s128p();
+	// s127();
+	// s127p();
+	// s126();
+	// s126p();
+	// s126pp();
+	// s122(n1, n3);
+	// s122p(n1, n3);
+	// s121();
+	// s121p();
+	// s1119();
+	// s1119p();
+	// s453();
+	// s453p();
+	// s352();
+	// s352p();
+	// s2710(s1);
+	// s2710p(s1);
+	// s2102();
+	// s2102p();
+	// s2275();
+	// s2275p();
 	// s275();
 	// s275p();
 	// s256();

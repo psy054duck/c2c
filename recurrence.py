@@ -88,18 +88,18 @@ class Recurrence:
 
     def solve_array(self):
         # t_list = self._prepare_t()
-        print(self.conditions)
         scalar_rec = self.to_scalar()
         scalar_closed_form = scalar_rec.solve()
         neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - Recurrence.neg_ind_var - 1}).to_sympy()
         new_conditions = [cond.subs(neg_scalar_closed_form_sp) for cond in self.conditions]
         new_rec, t_list = self._t_transitions(neg_scalar_closed_form_sp)
         # new_rec.add_constraint(to_z3(self.ind_var >= 0))
-        new_rec.to_file(filename='tmp.txt')
+        # new_rec.to_file(filename='tmp.txt')
         res = new_rec.solve()
         res = res.subs({res.ind_var: self.ind_var})
-        res.add_constraint(sp.And(*[t >= 0 for t in t_list]))
-        # res = res.subs({t: t >= 0 for t in t_list})
+        mid = sp.Symbol('mid', integer=True)
+        res.add_constraint(sp.And(*[sp.And(t >= 0, t < 6400) for t in t_list]))
+        res = res.subs({self.ind_var: 6400, mid: 3200})
         res.pp_print()
 
     def extract_scalar_part(self):
