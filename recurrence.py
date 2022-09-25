@@ -5,19 +5,20 @@ import sympy as sp
 from sympy.logic.boolalg import Boolean, true, false
 import z3
 from closed_form import Closed_form
-from utils import to_z3, to_sympy, get_app_by_var
+from utils import to_z3, to_sympy, get_app_by_var, solve_k, z3_all_vars
 
 class Recurrence:
 
     inductive_var = sp.Symbol('_n', integer=True)
     neg_ind_var = sp.Symbol('_d', integer=True)
 
-    def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]], ind_var=sp.Symbol('_n', integer=True)):
+    def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]], ind_var=sp.Symbol('_n', integer=True), acc_transitions=None):
         self.ind_var = ind_var
         self.conditions = [conditions[0]]
         for cond in conditions[1:]:
             self.conditions.append(sp.simplify(sp.And(sp.Not(self.conditions[-1]), cond)))
         self.transitions = transitions
+        self.acc_transitions = acc_transitions
         self._combine_branches()
         self.variables = reduce(set.union, [set(k for k in t.keys()) for t in transitions])
         self.variables = self.variables.union(reduce(set.union, [cond.free_symbols for cond in self.conditions]))
@@ -55,19 +56,25 @@ class Recurrence:
     def _combine_branches(self):
         new_conditions = []
         new_transitions = []
+        new_acc_transitions = []
         for i in range(len(self.conditions)):
             cond1, trans1 = self.conditions[i], self.transitions[i]
-            if trans1 in new_transitions: continue
+            acc1 = self.acc_transitions[i] if self.acc_transitions is not None else 0
+            if (self.acc_transitions is None and trans1 in new_transitions) or (trans1 in new_transitions and self.acc_transitions is not None and acc1 in new_acc_transitions): continue
             new_condition = cond1
             for j in range(i + 1, len(self.conditions)):
                 cond2, trans2 = self.conditions[j], self.transitions[j]
-                if trans2 in new_transitions: continue
-                if trans1 == trans2:
+                acc2 = 0 if self.acc_transitions is None else self.acc_transitions[j]
+                if (self.acc_transitions is None and trans2 in new_transitions) or (trans2 in new_transitions and self.acc_transitions is not None and acc2 in new_acc_transitions): continue
+                if trans1 == trans2 and acc1 == acc2:
                     new_condition = sp.Or(cond1, cond2)
             new_conditions.append(sp.simplify(new_condition))
             new_transitions.append(trans1)
+            if self.acc_transitions is not None:
+                new_acc_transitions.append(acc1)
         self.conditions = new_conditions
         self.transitions = new_transitions
+        self.acc_transitions = new_acc_transitions if self.acc_transitions is not None else None
 
     def __str__(self):
         res = []
@@ -95,9 +102,11 @@ class Recurrence:
         new_rec, t_list, acc, array_var = self._t_transitions(neg_scalar_closed_form_sp)
         array_func = array_var.func
         # new_rec.add_constraint(to_z3(self.ind_var >= 0))
-        # new_rec.to_file(filename='tmp.txt')
+        new_rec.to_file(filename='tmp.txt')
         arr_part_closed_form = new_rec.solve()
         arr_part_closed_form = arr_part_closed_form.subs({arr_part_closed_form.ind_var: self.ind_var})
+        arr_part_closed_form.pp_print()
+        exit(0)
         # mid = sp.Symbol('mid', integer=True)
         arr_part_closed_form.add_constraint(sp.And(*[t >= 0 for t in t_list]))
         # res = res.subs({self.ind_var: 800})
@@ -134,20 +143,24 @@ class Recurrence:
         new_conditions = []
         d = sp.Symbol('d_p', integer=True)
         scalar_closed_form = {var: scalar_closed_form[var].subs(Recurrence.neg_ind_var, d) for var in scalar_closed_form}
+        acc_transitions = []
         for cond, trans in zip(self.conditions, self.transitions):
             t_trans = {var: get_app_by_var(var.func, trans[var]) for var in trans if self.arity.get(var, 0) >= 1}
             acc_terms = {var: trans[var] - t_trans[var] for var in t_trans}
+            acc_terms = {var: acc_terms[var].subs(scalar_closed_form) for var in acc_terms}
             for app in t_trans:
                 cond_arr = sp.And(*[sp.Eq(t, arg.subs(scalar_closed_form)) for t, arg in zip(t_list, app.args)])
                 new_conditions.append(sp.simplify(sp.And(cond.subs(scalar_closed_form), cond_arr)))
                 new_trans = {t: self._expr2involving_t(t, arg1, arg2).subs(scalar_closed_form, simultaneous=True) for arg1, arg2, t in zip(app.args, t_trans[app].args, t_list)}
-                # new_trans = {t: t - 1 for arg, t in zip(t_trans[app].args, t_list)}
-                transitions.append(new_trans | {d: d + 1, acc: acc + acc_terms[app]})
+                # transitions.append(new_trans | {d: d + 1, acc: acc + acc_terms[app]})
+                transitions.append(new_trans | {d: d + 1})
+                acc_transitions.append({acc: acc + acc_terms[app]})
                 # transitions.append(new_trans | {d: d + 1})
         new_conditions.append(sp.simplify(sp.Not(sp.Or(*[cond for cond in new_conditions]))))
-        transitions.append({t: t for t in t_list} | {d: d + 1, acc: acc})
+        transitions.append({t: t for t in t_list} | {d: d + 1})
+        acc_transitions.append({acc: acc})
         # transitions.append({t: t for t in t_list} | {d: d + 1})
-        return Recurrence({d: 0, acc: 0} | self.inits, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list, acc, array_var
+        return Recurrence({d: 0, acc: 0} | self.inits, new_conditions, transitions, ind_var=Recurrence.neg_ind_var, acc_transitions=acc_transitions), t_list, acc, array_var
         # return Recurrence({d: 0}, new_conditions, transitions, ind_var=Recurrence.neg_ind_var), t_list
 
     def _expr2involving_t(self, t, t_expr, expr):
@@ -477,48 +490,8 @@ def my_simplify_sp(expr):
         return sp.Piecewise(*new_args)
     return sp.simplify(expr)
 
-def solve_k(constraints, k, all_ks):
-    solver = z3.Solver()
-    solver.add(*constraints)
-    all_vars = list(reduce(lambda x, y: x.union(y), [z3_all_vars(expr) for expr in constraints]) - set(all_ks))
-    all_vars_1 = all_vars + [z3.IntVal(1)]
-    # det_vars = [z3.Real('c_%d' % i) for i in range(len(all_vars_1))]
-    det_vars = [z3.Int('c_%d' % i) for i in range(len(all_vars_1))]
-    template = sum([c*v for c, v in zip(det_vars, all_vars_1)])
-    eqs = []
-    while solver.check() == z3.sat:
-        linear_solver = z3.Solver()
-        for _ in range(len(all_vars_1)):
-            solver.check()
-            m = solver.model()
-            eq = (m[k] == m.eval(template))
-            # print(m)
-            eqs.append(eq)
-            for var in (all_vars + list(all_ks)):
-                solver.push()
-                # var = random.choice(all_vars + list(all_ks))
-                solver.add(z3.Not(var == m[var]))
-                if solver.check() == z3.unsat:
-                    solver.pop()
-            # solver.add(*[z3.Not(var == m[var]) for var in all_vars + [k]])
-        linear_solver.add(*eqs)
-        linear_solver.check()
-        m_c = linear_solver.model()
-        cur_sol = m_c.eval(template)
-        solver.add(z3.Not(k == cur_sol))
-    return cur_sol
 
-def z3_all_vars(expr):
-    if z3.is_const(expr):
-        if z3.is_int_value(expr):
-            return set()
-        else:
-            return {expr}
-    else:
-        try:
-            return reduce(lambda x, y: x.union(y), [z3_all_vars(ch) for ch in expr.children()])
-        except:
-            return set()
+
 
 
 

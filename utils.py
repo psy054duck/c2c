@@ -164,6 +164,59 @@ def expr2c(expr: sp.Expr):
 
 def compute_N(cond, closed_form):
     ind_var = closed_form.ind_var
+    z3_cond = to_z3(cond.subs(closed_form.to_sympy()))
+    ind_var_z3 = to_z3(ind_var)
+    N = z3.Int('N')
+    e1 = z3.ForAll(ind_var_z3, z3.Implies(z3.And(0 <= ind_var_z3, ind_var_z3 < N), z3_cond))
+    e2 = z3.Not(z3.substitute(z3_cond, (ind_var_z3, N)))
+    qe = z3.Tactic('qe')
+    simplified = qe(z3.And(e1, e2))[0]
+    res = solve_k(simplified, N, set())
+    return to_sympy(res)
+
+def solve_k(constraints, k, all_ks):
+    solver = z3.Solver()
+    solver.add(*constraints)
+    all_vars = list(reduce(lambda x, y: x.union(y), [z3_all_vars(expr) for expr in constraints]) - set(all_ks))
+    all_vars_1 = all_vars + [z3.IntVal(1)]
+    # det_vars = [z3.Real('c_%d' % i) for i in range(len(all_vars_1))]
+    det_vars = [z3.Int('c_%d' % i) for i in range(len(all_vars_1))]
+    template = sum([c*v for c, v in zip(det_vars, all_vars_1)])
+    eqs = []
+    while solver.check() == z3.sat:
+        linear_solver = z3.Solver()
+        for _ in range(len(all_vars_1)):
+            solver.check()
+            m = solver.model()
+            eq = (m[k] == m.eval(template))
+            # print(m)
+            eqs.append(eq)
+            for var in (all_vars + list(all_ks)):
+                solver.push()
+                # var = random.choice(all_vars + list(all_ks))
+                solver.add(z3.Not(var == m[var]))
+                if solver.check() == z3.unsat:
+                    solver.pop()
+            # solver.add(*[z3.Not(var == m[var]) for var in all_vars + [k]])
+        linear_solver.add(*eqs)
+        linear_solver.check()
+        m_c = linear_solver.model()
+        cur_sol = m_c.eval(template)
+        solver.add(z3.Not(k == cur_sol))
+    return cur_sol
+
+
+def z3_all_vars(expr):
+    if z3.is_const(expr):
+        if z3.is_int_value(expr):
+            return set()
+        else:
+            return {expr}
+    else:
+        try:
+            return reduce(lambda x, y: x.union(y), [z3_all_vars(ch) for ch in expr.children()])
+        except:
+            return set()
 
 
 if __name__ == '__main__':

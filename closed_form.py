@@ -1,4 +1,5 @@
 from functools import reduce
+from re import sub
 import sympy as sp
 import z3
 from utils import to_z3, to_sympy, z3_deep_simplify, expr2c
@@ -22,7 +23,7 @@ class Closed_form:
     def subs(self, subs_dict):
         new_conditions = [cond.subs(subs_dict, simultaneous=True) for cond in self.conditions]
         new_closed_forms = [{var: closed[var].subs(subs_dict, simultaneous=True) for var in closed} for closed in self.closed_forms]
-        return Closed_form(new_conditions, new_closed_forms, self.ind_var)
+        return Closed_form(new_conditions, new_closed_forms, self.ind_var, self.bounded_vars)
 
     def add_constraint(self, constraint):
         self.conditions = [sp.simplify(sp.And(cond, constraint)) for cond in self.conditions]
@@ -60,18 +61,25 @@ class Closed_form:
 
         merged = {}
         for i in range(len(self.conditions)):
+            absorbed = reduce(set.union, (merged[idx] for idx in merged), set())
+            if i in absorbed: continue
             merged[i] = set()
             # if i in merged: continue
             # cur_closed_form = self.closed_forms[i]
             # cur_condition = self.conditions[i]
             for j in range(len(self.conditions)):
+                # print(merged)
                 absorbed = reduce(set.union, (merged[idx] for idx in merged))
-                if j in merged or i == j or j in absorbed: continue
+                # print(absorbed)
+                if i == j or j in absorbed: continue
                 s = z3.Solver()
                 for var in self.closed_forms[i]:
                     s.add(to_z3(self.conditions[j]))
                     s.push()
-                    s.add(to_z3(self.closed_forms[i][var]) != to_z3(self.closed_forms[j][var]))
+                    s.add(z3.Not(to_z3(self.closed_forms[i][var]) == to_z3(self.closed_forms[j][var])))
+                    # print(self.conditions[j])
+                    # print(z3.Not(to_z3(self.closed_forms[i][var]) == to_z3(self.closed_forms[j][var])))
+                    # print('*'*10)
                     if s.check() == z3.sat:
                         break
                     s.pop()
@@ -125,7 +133,7 @@ class Closed_form:
 
     def to_c(self):
         self._reorder_conditions()
-        self.pp_print()
+        # self.pp_print()
         return self.to_c_split()
 
     def is_splitable(self):
@@ -143,6 +151,7 @@ class Closed_form:
             self.conditions = [cc[1].as_set().as_relational(t) for cc in closed_forms_conditions]
 
     def to_c_split(self):
+        loops = []
         for closed, cond in zip(self.closed_forms, self.conditions):
             interval = cond.as_set()
             left = interval.inf
@@ -164,5 +173,6 @@ class Closed_form:
                     assignment = c_ast.Assignment('=', c_ast.ArrayRef(c_ast.ID(str(var.func)), c_ast.ID(str(t))), expr2c(closed[var]))
                     stmt = c_ast.Compound([assignment])
                     for_loop = c_ast.For(init, cond, nex, stmt)
-                    return for_loop
+                    loops.append(for_loop)
+        return loops
                     # print(generator.visit(for_loop))
