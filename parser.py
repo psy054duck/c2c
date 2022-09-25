@@ -137,6 +137,11 @@ def p_error(p):
 
 parser = yacc.yacc()
 
+def parse(filename):
+    with open(filename) as fp:
+        recurrence = parser.parse(fp.read())
+        return recurrence
+
 if __name__ == '__main__':
     with open('rec.txt') as fp:
         recurrence = parser.parse(fp.read())

@@ -1,3 +1,4 @@
+from functools import reduce
 import sympy as sp
 import z3
 from utils import to_z3, to_sympy, z3_deep_simplify, expr2c
@@ -57,15 +58,15 @@ class Closed_form:
         self.closed_forms = new_closed_forms
         self.conditions = new_conditions
 
-        new_closed_forms = []
-        new_conditions = []
-        merged = set()
+        merged = {}
         for i in range(len(self.conditions)):
-            if i in merged: continue
-            cur_closed_form = self.closed_forms[i]
-            cur_condition = self.conditions[i]
+            merged[i] = set()
+            # if i in merged: continue
+            # cur_closed_form = self.closed_forms[i]
+            # cur_condition = self.conditions[i]
             for j in range(len(self.conditions)):
-                if j in merged or i == j: continue
+                absorbed = reduce(set.union, (merged[idx] for idx in merged))
+                if j in merged or i == j or j in absorbed: continue
                 s = z3.Solver()
                 for var in self.closed_forms[i]:
                     s.add(to_z3(self.conditions[j]))
@@ -77,14 +78,27 @@ class Closed_form:
                 else:
                     # new_closed_forms.append(self.closed_forms[i])
                     # new_conditions.append(z3.Or(self.conditions[i], self.conditions[j]))
-                    cur_condition = to_sympy(z3_deep_simplify(z3.And(z3.BoolVal(True), *sim(to_z3(sp.Or(cur_condition, self.conditions[j])))[0])))
-                    merged.add(j)
-            new_closed_forms.append(cur_closed_form)
+                    # cur_condition = to_sympy(z3_deep_simplify(z3.And(z3.BoolVal(True), *sim(to_z3(sp.Or(cur_condition, self.conditions[j])))[0])))
+                    # merged.add(j)
+                    merged[i].add(j)
+            # new_closed_forms.append(cur_closed_form)
+            # new_conditions.append(cur_condition)
+
+        new_closed_forms = []
+        new_conditions = []
+        absorbed = reduce(set.union, (merged[idx] for idx in merged))
+        for i in merged:
+            if i in absorbed: continue
+            cur_condition = to_sympy(z3_deep_simplify(z3.And(z3.BoolVal(True), *sim(to_z3(sp.Or(self.conditions[i], *[self.conditions[j] for j in merged[i]])))[0])))
+            new_closed_forms.append(self.closed_forms[i])
             new_conditions.append(cur_condition)
         self.closed_forms = new_closed_forms
         self.conditions = new_conditions
-        if len(merged) != 0:
+        if len(absorbed) != 0:
             self._simplify_conditions()
+
+    def simplify(self):
+        self._simplify_conditions()
 
     def set_ind_var(self, ind_var):
         self.ind_var = ind_var
@@ -112,7 +126,7 @@ class Closed_form:
     def to_c(self):
         self._reorder_conditions()
         self.pp_print()
-        self.to_c_split()
+        return self.to_c_split()
 
     def is_splitable(self):
         try:
@@ -140,7 +154,7 @@ class Closed_form:
 
             for var in closed:
                 if len(var.args) > 0:
-                    generator = c_generator.CGenerator()
+                    # generator = c_generator.CGenerator()
                     assert(len(var.args) == 1)
                     t = var.args[0]
                     decl = c_ast.Decl(str(t), None, None, None, None, c_ast.TypeDecl(str(t), [], None, c_ast.IdentifierType(['int'])), c_ast.Constant('int', str(left)), None)
@@ -150,4 +164,5 @@ class Closed_form:
                     assignment = c_ast.Assignment('=', c_ast.ArrayRef(c_ast.ID(str(var.func)), c_ast.ID(str(t))), expr2c(closed[var]))
                     stmt = c_ast.Compound([assignment])
                     for_loop = c_ast.For(init, cond, nex, stmt)
-                    print(generator.visit(for_loop))
+                    return for_loop
+                    # print(generator.visit(for_loop))

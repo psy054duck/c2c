@@ -162,6 +162,8 @@ def expr2c(expr: sp.Expr):
         raise Exception('conversion for type "%s" is not implemented: %s' % (type(expr), expr))
     return res
 
+def compute_N(cond, closed_form):
+    ind_var = closed_form.ind_var
 
 
 if __name__ == '__main__':

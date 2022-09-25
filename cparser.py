@@ -3,6 +3,7 @@ from logging import exception
 from pycparser import parse_file, c_generator
 from pycparser.c_ast import *
 import sympy as sp
+from parser import parse
 
 class Vectorizer:
     def __init__(self):
@@ -61,6 +62,10 @@ class Vectorizer:
         res = []
         for block_item in node.block_items:
             b = self.visit(block_item)
+            if isinstance(block_item, Decl) and isinstance(b[1]['init'], int):
+                self.symbol_table[b[0]] = b[1]['init']
+            elif isinstance(block_item, Assignment) and isinstance(b[1], int):
+                self.symbol_table[b[0]] = b[1]
             res.append(b)
         return res
 
@@ -104,7 +109,14 @@ class Vectorizer:
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
         try:
-            for2rec(init, nex, stmt, filename='rec.txt')
+            filename = 'rec.txt'
+            for2rec(init, nex, stmt, filename=filename)
+            rec = parse(filename)
+            scalar_cf, array_cf = rec.solve_array()
+            scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
+            array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
+            # scalar_cf.pp_print()
+            # node = array_cf.to_c()
         except:
             pass
         return node
@@ -120,17 +132,18 @@ class Vectorizer:
         lvalue = self.visit(node.lvalue)
         rvalue = self.visit(node.rvalue)
         if op == '=':
-            return (lvalue, rvalue)
+            ret = (lvalue, rvalue)
         elif op == '+=':
-            return (lvalue, lvalue + rvalue)
+            ret = (lvalue, lvalue + rvalue)
         elif op == '-=':
-            return (lvalue, lvalue - rvalue)
+            ret = (lvalue, lvalue - rvalue)
         elif op == '*=':
-            return (lvalue, lvalue * rvalue)
+            ret = (lvalue, lvalue * rvalue)
         elif op == '/=':
-            return (lvalue, lvalue / rvalue) # type
+            ret = (lvalue, lvalue / rvalue) # type
         else:
             raise Exception('operation "%s" is no implemented' % op)
+        return ret
 
     def visit_ArrayRef(self, node):
         name = sp.Function(str(self.visit(node.name)))
@@ -219,9 +232,9 @@ def flat_body(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
+    # c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
-    # c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
+    c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
