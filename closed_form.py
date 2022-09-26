@@ -3,16 +3,18 @@ from lzma import is_check_supported
 from re import sub
 import sympy as sp
 import z3
-from utils import to_z3, to_sympy, z3_deep_simplify, expr2c
+from utils import to_z3, to_sympy, z3_deep_simplify, expr2c, get_app_by_var
 import pycparser.c_ast as c_ast
 from pycparser import c_generator
+import recurrence
 
 class Closed_form:
-    def __init__(self, conditions, closed_forms, ind_var, bounded_vars=None):
+    def __init__(self, conditions, closed_forms, ind_var, sum_end, bounded_vars=None):
         self.conditions = [sp.S.true] if len(conditions) == 1 else conditions
         self.closed_forms = closed_forms
         self.ind_var = ind_var
         self.bounded_vars = bounded_vars
+        self.sum_end = sum_end
         # self._simplify_conditions()
 
     def pp_print(self):
@@ -24,7 +26,7 @@ class Closed_form:
     def subs(self, subs_dict):
         new_conditions = [cond.subs(subs_dict, simultaneous=True) for cond in self.conditions]
         new_closed_forms = [{var: closed[var].subs(subs_dict, simultaneous=True) for var in closed} for closed in self.closed_forms]
-        return Closed_form(new_conditions, new_closed_forms, self.ind_var, self.bounded_vars)
+        return Closed_form(new_conditions, new_closed_forms, self.ind_var, self.sum_end, self.bounded_vars)
 
     def add_constraint(self, constraint):
         self.conditions = [sp.simplify(sp.And(cond, constraint)) for cond in self.conditions]
@@ -194,3 +196,23 @@ class Closed_form:
                     loops.append(for_loop)
         return loops
                     # print(generator.visit(for_loop))
+
+    def to_rec(self, scalar_closed_forms):
+        assert(self.bounded_vars is not None)
+        Rec = recurrence.Recurrence
+        d = sp.Symbol('d_p', integer=True)
+        scalar_closed_form = {var: scalar_closed_form[var].subs(Rec.neg_ind_var, d) for var in scalar_closed_form}
+        transitions = []
+        acc_transitions = []
+        acc_symbol = sp.Symbol('_acc', integer=True)
+        for cond, trans in zip(self.conditions, self.closed_forms):
+            assert(len(trans) == 1)
+            left_app = list(trans)[0]
+            right_app = get_app_by_var(left_app.func, trans[left_app])
+            # app_trans = {var: get_app_by_var(var.func, trans[var]) for var in trans}
+            t_trans = {arg: arg_p for arg, arg_p in zip(left_app.args, right_app.args)}
+            transitions.append(t_trans)
+            acc = trans[left_app] - right_app
+            acc_transitions.append(acc)
+        inits = {Rec.neg_ind_var: 0, acc_symbol: 0}
+        return Rec(inits, self.conditions, transitions, Rec.neg_ind_var, acc_transitions)

@@ -11,6 +11,19 @@ def z3_deep_simplify(expr):
     sim = z3.Tactic('ctx-solver-simplify')
     cond_list = list(sim(expr)[0])
     # print(cond_list)
+    new_cond_list = []
+    for cond in cond_list:
+        sp_cond = to_sympy(cond)
+        if len(sp_cond.free_symbols) == 1:
+            try:
+                new_cond = to_z3(sp_cond.as_set().as_relational(list(sp_cond.free_symbols)[0]))
+                new_cond_list.append(new_cond)
+            except:
+                new_cond_list.append(to_z3(sp_cond))
+        else:
+            new_cond_list.append(to_z3(sp_cond))
+    cond_list = new_cond_list
+
     if len(cond_list) == 0:
         return z3.BoolVal(True)
     elif len(cond_list) == 1:

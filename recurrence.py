@@ -23,6 +23,7 @@ class Recurrence:
         self.variables = reduce(set.union, [set(k for k in t.keys()) for t in transitions])
         self.variables = self.variables.union(reduce(set.union, [cond.free_symbols for cond in self.conditions]))
         self.inits = {var: inits[var] for var in inits if var in self.variables}
+        self.sum_end = sp.Symbol('sum_end', integer=True)
         # self.variables = self.variables - {self.ind_var}
         self.arity = {}
         for var in self.variables:
@@ -99,7 +100,6 @@ class Recurrence:
         # t_list = self._prepare_t()
         scalar_rec = self.to_scalar()
         scalar_closed_form = scalar_rec.solve()
-        scalar_closed_form.pp_print()
         neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - Recurrence.neg_ind_var - 1}).to_sympy()
         new_conditions = [cond.subs(neg_scalar_closed_form_sp) for cond in self.conditions]
         new_rec, t_list, acc, array_var = self._t_transitions(neg_scalar_closed_form_sp)
@@ -121,7 +121,7 @@ class Recurrence:
         for closed in part_closed_form.closed_forms:
             arr_app = arr_var(*[closed[t] for t in t_list]) + closed[acc]
             arr_closed_forms.append({arr_var(*t_list): arr_app})
-        return Closed_form(part_closed_form.conditions, arr_closed_forms, self.ind_var, t_list)
+        return Closed_form(part_closed_form.conditions, arr_closed_forms, self.ind_var, self.sum_end, t_list)
 
     def extract_scalar_part(self):
         scalar_vars = {var for var in self.arity if self.arity[var] == 0}
@@ -261,12 +261,12 @@ class Recurrence:
                 if acc_transition is not None:
                     assert(len(seq) == 1)
                     for i in seq:
-                        acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, acc_k + len(seq)*k - 1))
+                        acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
                     res_closed_forms.append(closed | {sp.Symbol('_acc', integer=True): acc})
                 else:
                     res_closed_forms.append(closed)
                 acc_k += len(seq)*k
-        return Closed_form(conditions, res_closed_forms, self.ind_var)
+        return Closed_form(conditions, res_closed_forms, self.ind_var, self.sum_end)
         
     def solve_with_inits(self, inits: dict[sp.Symbol, sp.Integer | int]):
         l = 10

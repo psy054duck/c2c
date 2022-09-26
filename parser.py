@@ -71,6 +71,14 @@ def p_atom_cond_5(p):
     '''atom_cond : expr LE expr'''
     p[0] = p[1] <= p[3]
 
+def p_atom_cond_6(p):
+    '''atom_cond : TRUE'''
+    p[0] = sp.S.true
+
+def p_atom_cond_7(p):
+    '''atom_cond : FALSE'''
+    p[0] = sp.S.false
+
 def p_transitions_1(p):
     '''transitions : transition transitions'''
     p[0] = p[1] | p[2]
@@ -155,20 +163,20 @@ if __name__ == '__main__':
         recurrence = parser.parse(fp.read())
         x = sp.Symbol('x', integer=True)
         y = sp.Symbol('y', integer=True)
-        res = recurrence.solve()
-        mid = sp.Symbol('mid', integer=True)
-        res = res.subs({res.ind_var: 6400, mid: 3200})
-        res.pp_print()
+        # res = recurrence.solve_array()
+        # mid = sp.Symbol('mid', integer=True)
+        # res = res.subs({res.ind_var: 6400, mid: 3200})
+        # res.pp_print()
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
-        # scalar_closed_form, array_closed_form = recurrence.solve_array()
-        # scalar_closed_form.pp_print()
+        scalar_closed_form, array_closed_form = recurrence.solve_array()
+        scalar_closed_form.pp_print()
         # for t in array_closed_form.bounded_vars:
         #     array_closed_form.add_constraint(t < 6400)
         # array_closed_form = array_closed_form.subs({array_closed_form.ind_var: 6400})
-        # array_closed_form._simplify_conditions()
+        array_closed_form._simplify_conditions()
         # array_closed_form.to_c()
-        # array_closed_form.pp_print()
+        array_closed_form.pp_print()
         # res.pp_print()
         # values = {x: -10, y: 10, Recurrence.inductive_var: 11}
         # print(res.eval(values))

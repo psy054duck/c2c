@@ -2,7 +2,7 @@ import sympy as sp
 import ply.lex as lex
 
 keywords = (
-    'if', 'else'
+    'if', 'else', 'True', 'False'
 )
 
 tokens = (
@@ -37,6 +37,8 @@ t_LE = r'<='
 t_GE = r'>='
 t_AND = r'&&'
 t_OR = r'\|\|'
+t_TRUE = r'True'
+t_FALSE = r'False'
 
 t_ignore = ' \t'
 
