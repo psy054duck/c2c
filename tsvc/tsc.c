@@ -876,6 +876,59 @@ int s112()
 	return 0;
 }
 
+int s112p()
+{
+
+//	linear dependence testing
+//	loop reversal
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s112 ");
+	__attribute__((aligned(16))) float tmp[LEN] = {};
+	__attribute__((aligned(16))) float tmp2[LEN] = {};
+	start_t = clock();
+
+	for (int nl = 0; nl < 3*ntimes; nl++) {
+		memcpy(tmp2, a, sizeof(a));
+		//for (int i = 0; i < LEN; i+=1) {
+		//	tmp[i] = a[i];
+		//	// tmp[i+1] = a[i+1];
+		//	// tmp[i+2] = a[i+2];
+		//	// tmp[i+3] = a[i+3];
+		//}
+//		#pragma vector always
+		// for (int i = LEN - 2; i >= 0; i--) {
+		// 	a[i+1] = a[i] + b[i];
+		// 	a[i] = a[i-1] + b[i-1];
+		// }
+		for (int i = 0; i < LEN; i++) {
+			tmp2[i] = a[i] + b[i];
+		}
+		// a[LEN-1] = tmp2[LEN-1];
+		memcpy(a + 1, tmp2, sizeof(a[0])*(LEN-1));
+		// for (int i = 0; i < LEN-1; i++) {
+		// 	a[i+1] = tmp2[i];
+		// }
+		// for (int i = 0; i < (LEN - 1) - (LEN-1)%2; i+=2) {
+		// 	a[i+1] = tmp[i] + b[i];
+		// 	a[i+2] = tmp[i+1] + b[i+1];
+		// 	// a[i+3] = tmp[i+2] + b[i+2];
+		// 	// a[i+4] = tmp[i+3] + b[i+3];
+		// }
+		// for (int i = (LEN-1) - (LEN-1)%2; i < LEN-1; i++) {
+		// 	a[i+1] = tmp[i] + b[i];
+		// }
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S112p\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
 
 int s1112()
 {
@@ -889,7 +942,7 @@ int s1112()
 	init("s112 ");
 	start_t = clock();
 
-	for (int nl = 0; nl < ntimes*3; nl++) {
+	for (int nl = 0; nl < ntimes*5; nl++) {
 		for (int i = LEN - 1; i >= 0; i--) {
 			a[i] = b[i] + (float) 1.;
 		}
@@ -899,6 +952,38 @@ int s1112()
 	clock_dif_sec = (double) (clock_dif /1000000.0);
 	
 	printf("S1112\t %.2f \t\t ", clock_dif_sec);
+	check(1);
+	return 0;
+}
+
+int s1112p()
+{
+
+//	linear dependence testing
+//	loop reversal
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+	
+
+	init("s112 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < ntimes*5; nl++) {
+		// for (int i = 0; i < LEN; i+=4) {
+		// 	a[i] = b[i] + c[i];
+		// 	a[i+1] = b[i+1] + c[i+1];
+		// 	a[i+2] = b[i+2] + c[i+2];
+		// 	a[i+3] = b[i+3] + c[i+3];
+		// }
+		for (int i = 0; i < LEN; i+=1) {
+			a[i] = b[i] + (float) 1.;
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif /1000000.0);
+	
+	printf("S1112p\t %.2f \t\t ", clock_dif_sec);
 	check(1);
 	return 0;
 }
@@ -6506,8 +6591,10 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	s172(n1, n3);
-	s172p(n1, n3);
+	s112();
+	s112p();
+	// s172(n1, n3);
+	// s172p(n1, n3);
 	// s233();
 	// s233p();
 	// s222();
