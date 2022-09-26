@@ -1,4 +1,5 @@
 from functools import reduce
+from lzma import is_check_supported
 from re import sub
 import sympy as sp
 import z3
@@ -134,12 +135,29 @@ class Closed_form:
     def to_c(self):
         self._reorder_conditions()
         # self.pp_print()
-        return self.to_c_split()
+        if self.is_splitable() and self.bounded_vars is not None:
+            res = self.to_c_split()
+        elif self.bounded_vars is None:
+            res = self.to_c_scalar()
+        return res
+
+    def to_c_scalar(self):
+        for cond in self.conditions:
+            block_items = []
+            if cond is sp.S.true:
+                for closed_form in self.closed_forms:
+                    for var in closed_form:
+                        lhs = expr2c(var)
+                        rhs = expr2c(closed_form[var])
+                        assignment = c_ast.Assignment('=', lhs, rhs)
+                        block_items.append(assignment)
+                res = c_ast.Compound(block_items)
+        return res
 
     def is_splitable(self):
         try:
             _ = [cond.as_set() for cond in self.conditions]
-            return True
+            return len(self.conditions) > 1
         except:
             return False
 

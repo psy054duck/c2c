@@ -2111,6 +2111,30 @@ int s172( int n1, int n3)
 	return 0;
 }
 
+int s172p( int n1, int n3)
+{
+//	symbolics
+//	vectorizable if n3 .ne. 0
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s172 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < ntimes; nl++) {
+			for (int i = n1-1; i < LEN; i += n3) {
+				a[i] += b[i];
+			}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S172p\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
 // %1.7
 
 int s173()
@@ -6482,25 +6506,27 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	s233();
-	s233p();
-	s222();
-	s222p();
-	s221();
-	s221p();
-	s132();
-	s132p();
-	s128();
-	s128p();
-	s127();
-	s127p();
-	s126();
-	s126p();
-	s126pp();
-	s122(n1, n3);
-	s122p(n1, n3);
-	s121();
-	s121p();
+	s172(n1, n3);
+	s172p(n1, n3);
+	// s233();
+	// s233p();
+	// s222();
+	// s222p();
+	// s221();
+	// s221p();
+	// s132();
+	// s132p();
+	// s128();
+	// s128p();
+	// s127();
+	// s127p();
+	// s126();
+	// s126p();
+	// s126pp();
+	// s122(n1, n3);
+	// s122p(n1, n3);
+	// s121();
+	// s121p();
 	// s1119();
 	// s1119p();
 	// s453();

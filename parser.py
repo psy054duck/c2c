@@ -88,9 +88,17 @@ def p_transition_2(p):
     p[0] = {p[1]: p[3]}
 
 def p_array_ref(p):
-    '''array_ref : VARIABLE LPAREN expr RPAREN'''
+    '''array_ref : VARIABLE array_index'''
     f = sp.Function(p[1])
-    p[0] = f(p[3])
+    p[0] = f(*p[2])
+
+def p_array_index_1(p):
+    '''array_index : LPAREN expr RPAREN array_index'''
+    p[0] = [p[2]] + p[4]
+
+def p_array_index_2(p):
+    '''array_index : LPAREN expr RPAREN'''
+    p[0] = [p[2]]
 
 def p_expr_1(p):
     '''expr : factor PLUS expr'''
@@ -147,15 +155,19 @@ if __name__ == '__main__':
         recurrence = parser.parse(fp.read())
         x = sp.Symbol('x', integer=True)
         y = sp.Symbol('y', integer=True)
+        res = recurrence.solve()
+        mid = sp.Symbol('mid', integer=True)
+        res = res.subs({res.ind_var: 6400, mid: 3200})
+        res.pp_print()
         # recurrence.solve_periodic([0, 1])
         # res = recurrence.solve_with_inits({x: sp.Integer(-200), y: sp.Integer(0)})
-        scalar_closed_form, array_closed_form = recurrence.solve_array()
-        scalar_closed_form.pp_print()
-        for t in array_closed_form.bounded_vars:
-            array_closed_form.add_constraint(t < 6400)
-        array_closed_form = array_closed_form.subs({array_closed_form.ind_var: 6400})
-        array_closed_form._simplify_conditions()
-        array_closed_form.to_c()
+        # scalar_closed_form, array_closed_form = recurrence.solve_array()
+        # scalar_closed_form.pp_print()
+        # for t in array_closed_form.bounded_vars:
+        #     array_closed_form.add_constraint(t < 6400)
+        # array_closed_form = array_closed_form.subs({array_closed_form.ind_var: 6400})
+        # array_closed_form._simplify_conditions()
+        # array_closed_form.to_c()
         # array_closed_form.pp_print()
         # res.pp_print()
         # values = {x: -10, y: 10, Recurrence.inductive_var: 11}

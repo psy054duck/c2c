@@ -69,6 +69,10 @@ def to_z3(sp_expr):
         res = to_z3(self.args[0]) % to_z3(self.args[1])
     elif isinstance(self, sp.Abs):
         res = z3.Abs(to_z3(self.args[0]))
+    elif isinstance(self, sp.Sum):
+        s = z3.Function('Sum', z3.IntSort(), z3.IntSort(), z3.IntSort(), z3.IntSort(), z3.IntSort())
+        expr, (idx, start, end) = self.args
+        res = s(to_z3(expr), to_z3(idx), to_z3(start), to_z3(end))
     elif self is true:
         res = z3.BoolVal(True)
     elif self is false:
@@ -202,6 +206,14 @@ def solve_k(constraints, k, all_ks):
         linear_solver.check()
         m_c = linear_solver.model()
         cur_sol = m_c.eval(template)
+        # check whether k is a constant
+        solver.push()
+        solver.add(z3.Not(k == m.eval(cur_sol)))
+        if solver.check() == z3.unsat:
+            cur_sol = m.eval(cur_sol)
+            break
+        solver.pop()
+        ###############################
         solver.add(z3.Not(k == cur_sol))
     return cur_sol
 
