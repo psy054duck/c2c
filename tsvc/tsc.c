@@ -863,7 +863,8 @@ int s112()
 	start_t = clock();
 
 	for (int nl = 0; nl < 3*ntimes; nl++) {
-//		#pragma vector always
+	    //#pragma clang loop vectorize(enable)
+        #pragma vector always
 		for (int i = LEN - 2; i >= 0; i--) {
 			a[i+1] = a[i] + b[i];
 		}
@@ -903,6 +904,7 @@ int s112p()
 		// 	a[i+1] = a[i] + b[i];
 		// 	a[i] = a[i-1] + b[i-1];
 		// }
+	    #pragma clang loop vectorize(enable)
 		for (int i = 0; i < LEN; i++) {
 			tmp2[i] = a[i] + b[i];
 		}
@@ -3214,6 +3216,36 @@ int s252()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S252\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
+int s252p()
+{
+
+//	scalar and array expansion
+//	loop with ambiguous scalar temporary
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+	init( "s252 ");
+	start_t = clock();
+
+	float t, s;
+	for (int nl = 0; nl < ntimes; nl++) {
+		// t = (float) 0.;
+		a[0] = b[0]*c[0];
+		for (int i = 1; i < LEN; i++) {
+			a[i] = b[i] * c[i] + b[i-1] * c[i-1];
+			// a[i] = s + t;
+		}
+		s = b[LEN-1]*c[LEN-1];
+		t = b[LEN-1]*c[LEN-1];
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S252p\t %.2f \t\t", clock_dif_sec);;
 	check(1);
 	return 0;
 }
@@ -6591,8 +6623,10 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	s112();
-	s112p();
+	// s252();
+	// s252p();
+	// s112();
+	// s112p();
 	// s172(n1, n3);
 	// s172p(n1, n3);
 	// s233();
@@ -6631,9 +6665,9 @@ int main(){
 	// s256();
 	// s256p();
 	// s256pp();
-	// s231();
-	// s231p();
-	// s231pp();
+	s231();
+	s231p();
+	s231pp();
 	// s231ppp();
 	// s276();
 	// s276p();

@@ -149,7 +149,9 @@ class Recurrence:
         for cond, trans in zip(self.conditions, self.transitions):
             t_trans = {var: get_app_by_var(var.func, trans[var]) for var in trans if self.arity.get(var, 0) >= 1}
             acc_terms = {var: trans[var] - t_trans[var] for var in t_trans}
-            acc_terms = {var: acc_terms[var].subs(scalar_closed_form) for var in acc_terms}
+            print(acc_terms)
+            # acc_terms = {var: acc_terms[var].subs(scalar_closed_form) for var in acc_terms}
+            print(acc_terms)
             for app in t_trans:
                 cond_arr = sp.And(*[sp.Eq(t, arg.subs(scalar_closed_form)) for t, arg in zip(t_list, app.args)])
                 new_conditions.append(sp.simplify(sp.And(cond.subs(scalar_closed_form), cond_arr)))

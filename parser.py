@@ -148,6 +148,10 @@ def p_operand_3(p):
     '''operand : array_ref'''
     p[0] = p[1]
 
+def p_operand_4(p):
+    '''operand : LPAREN expr RPAREN'''
+    p[0] = p[2]
+
 def p_error(p):
     print(p)
 

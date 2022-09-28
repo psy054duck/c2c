@@ -69,7 +69,7 @@ class Vectorizer:
             if isinstance(block_item, Decl):
                 self.symbol_table[b[0]] = b[1]
             elif isinstance(block_item, Assignment) and isinstance(b[1], int):
-                self.symbol_table[b[0]] = b[1]
+                self.symbol_table[str(b[0])] = {'init': b[1]}# b[1]
             else:
                 res.append(b)
             
@@ -127,6 +127,7 @@ class Vectorizer:
             rec = parse(filename)
             scalar_cf, array_cf = rec.solve_array()
             scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
+            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
             num_iter = compute_N(cond, scalar_cf)
             scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
             array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
@@ -139,6 +140,7 @@ class Vectorizer:
                     for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
                         array_cf.add_constraint(bnd_var < bnd)
             array_cf.simplify()
+            array_cf.pp_print()
             nodes = array_cf.to_c()
             nodes.extend(scalar_cf.to_c())
             res = nodes, array_cf
@@ -260,7 +262,7 @@ def flat_body(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    c_ast = parse_file('test1.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
+    c_ast = parse_file('test2.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
     # c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
     vectorizer = Vectorizer()

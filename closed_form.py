@@ -159,12 +159,12 @@ class Closed_form:
     def is_splitable(self):
         try:
             _ = [cond.as_set() for cond in self.conditions]
-            return len(self.conditions) > 1
+            return len(self.conditions) >= 1
         except:
             return False
 
     def _reorder_conditions(self):
-        if self.is_splitable():
+        if self.is_splitable() and len(self.conditions) > 1:
             t = list(self.conditions[0].free_symbols)[0]
             closed_forms_conditions = sorted(zip(self.closed_forms, self.conditions), key=lambda x: x[1].as_set().sup)
             self.closed_forms = [cc[0] for cc in closed_forms_conditions]
