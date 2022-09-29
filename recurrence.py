@@ -12,8 +12,9 @@ class Recurrence:
     inductive_var = sp.Symbol('_n', integer=True)
     neg_ind_var = sp.Symbol('_d', integer=True)
 
-    def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]], ind_var=sp.Symbol('_n', integer=True), acc_transitions=None):
+    def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]], ind_var=sp.Symbol('_n', integer=True), acc_transitions=None, bounded_vars=None):
         self.ind_var = ind_var
+        self.bounded_vars = bounded_vars
         self.conditions = [conditions[0]]
         for cond in conditions[1:]:
             self.conditions.append(sp.simplify(sp.And(sp.Not(self.conditions[-1]), cond)))

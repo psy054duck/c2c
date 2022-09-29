@@ -5,6 +5,8 @@ from pycparser.c_ast import *
 import sympy as sp
 from parser import parse
 from utils import compute_N
+from closed_form import Closed_form
+from recurrence import Recurrence
 
 class Vectorizer:
     def __init__(self):
@@ -74,7 +76,8 @@ class Vectorizer:
                 res.append(b)
             
             if isinstance(block_item, For) and (len(self.loop_stack) == 0 or i == len(node.block_items) - 1 or b[1] is None):
-                new_blocks.extend(b[0])
+                pass
+                # new_blocks.extend(b[0])
             else:
                 new_blocks.append(block_item)
         node.block_items = new_blocks
@@ -123,8 +126,10 @@ class Vectorizer:
         self.loop_stack.pop()
         # try:
         filename = 'rec.txt'
-        for2rec(init, nex, stmt, filename=filename)
-        rec = parse(filename)
+        rec = for2rec(init, nex, stmt, filename=filename)
+        if rec is None:
+            rec = parse(filename)
+        rec.print()
         scalar_cf, array_cf = rec.solve_array()
         scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
         # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
@@ -142,8 +147,8 @@ class Vectorizer:
         array_cf.simplify()
         # array_cf.pp_print()
         # nodes = array_cf.to_c()
-        nodes = scalar_cf.to_c()
-        res = nodes, array_cf
+        # nodes = scalar_cf.to_c()
+        res = scalar_cf, array_cf
         # array_cf.pp_print()
         # array_cf.to_rec()
         # return scalar_cf, array_cf
@@ -206,7 +211,10 @@ class Vectorizer:
         raise Exception('visitor for "%s" is not implemented' % type(node))
 
 def for2rec(init, nex, body, filename=None):
-    conds, stmts = flat_body(body + [nex])
+    if len(body) == 1 and all(isinstance(i, Closed_form) for i in body[0]):
+        return flat_body_inner_arr(body[0])
+    else:
+        conds, stmts = flat_body_compound(body + [nex])
     if filename is None:
         pass
     else:
@@ -224,7 +232,21 @@ def for2rec(init, nex, body, filename=None):
 def _transform_stmt(stmts):
     return '\n'.join(['\t%s = %s;' % (var, expr) for var, expr in stmts])
 
-def flat_body(body):
+def flat_body_inner_arr(body):
+    assert(all(isinstance(b, Closed_form) for b in body))
+    scalar_cf, arr_cf = body
+    # arr_cf = arr_cf.subs()
+
+    conditions = []
+    transitions = []
+    for scalar_cond, scalar_form in zip(scalar_cf.conditions, scalar_cf.closed_forms):
+        for arr_cond, arr_form in zip(arr_cf.conditions, arr_cf.closed_forms):
+            conditions.append(sp.And(scalar_cond, arr_cond))
+            transitions.append(scalar_form | arr_form)
+    rec = Recurrence({}, conditions, transitions, bounded_vars=arr_cf.bounded_vars)
+    return rec
+
+def flat_body_compound(body):
     res_cond = [True]
     res_stmt = [[]]
     is_if = lambda x: len(x) > 0 and (x[0].is_Boolean or x[0].is_Relational)
@@ -244,8 +266,8 @@ def flat_body(body):
             iftrue = [item]
             iffalse = []
 
-        t_conds, t_recs = flat_body(iftrue)
-        f_conds, f_recs = flat_body(iffalse)
+        t_conds, t_recs = flat_body_compound(iftrue)
+        f_conds, f_recs = flat_body_compound(iffalse)
 
         t_conds = [sp.And(cond, c) for c in t_conds]
         f_conds = [sp.And(sp.Not(cond), c) for c in f_conds]
