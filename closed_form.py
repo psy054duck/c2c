@@ -123,7 +123,7 @@ class Closed_form:
             cond_p = sp.S.true if sp.Or(cond, self.ind_var < 0) is sp.S.true else cond
             for var in closed:
                 res_tmp.setdefault(var, []).append((closed[var], cond_p))
-        res = {var: sp.Piecewise(*res_tmp[var]) for var in res_tmp}
+        res = {var: sp.Piecewise(*(res_tmp[var] + [(-1, True)])) for var in res_tmp}
         return res
 
     def eval(self, values):

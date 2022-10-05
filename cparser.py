@@ -126,6 +126,7 @@ class Vectorizer:
         self.loop_stack.pop()
         # try:
         filename = 'rec.txt'
+        considered = set()
         rec = for2rec(init, nex, stmt, filename=filename)
         if rec is None:
             rec = parse(filename)
@@ -138,22 +139,14 @@ class Vectorizer:
         array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
         array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
         considered = set()
-        for closed_forms in array_cf.closed_forms:
-            not_considered = set(closed_forms) - considered
-            for var in not_considered:
-                considered.add(var)
-                for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
-                    array_cf.add_constraint(bnd_var < bnd)
+        # for closed_forms in array_cf.closed_forms:
+        #     not_considered = set(closed_forms) - considered
+        #     for var in not_considered:
+        #         considered.add(var)
+        #         for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
+        #             array_cf.add_constraint(bnd_var < bnd)
         array_cf.simplify()
-        # array_cf.pp_print()
-        # nodes = array_cf.to_c()
-        # nodes = scalar_cf.to_c()
         res = scalar_cf, array_cf
-        # array_cf.pp_print()
-        # array_cf.to_rec()
-        # return scalar_cf, array_cf
-        # except:
-        #     res = [node], None
         return res
     
     def visit_If(self, node):
@@ -212,7 +205,7 @@ class Vectorizer:
 
 def for2rec(init, nex, body, filename=None):
     if len(body) == 1 and all(isinstance(i, Closed_form) for i in body[0]):
-        return flat_body_inner_arr(body[0])
+        return flat_body_inner_arr(body[0], nex)
     else:
         conds, stmts = flat_body_compound(body + [nex])
     if filename is None:
@@ -232,17 +225,23 @@ def for2rec(init, nex, body, filename=None):
 def _transform_stmt(stmts):
     return '\n'.join(['\t%s = %s;' % (var, expr) for var, expr in stmts])
 
-def flat_body_inner_arr(body):
+def flat_body_inner_arr(body, nex):
     assert(all(isinstance(b, Closed_form) for b in body))
     scalar_cf, arr_cf = body
     # arr_cf = arr_cf.subs()
 
     conditions = []
     transitions = []
+    variables = set()
     for scalar_cond, scalar_form in zip(scalar_cf.conditions, scalar_cf.closed_forms):
         for arr_cond, arr_form in zip(arr_cf.conditions, arr_cf.closed_forms):
             conditions.append(sp.And(scalar_cond, arr_cond))
-            transitions.append(scalar_form | arr_form)
+            transitions.append(scalar_form | arr_form | {nex[0]: nex[1]})
+            variables = variables.union(set(scalar_form))
+    all_cond = sp.simplify(sp.Or(*conditions))
+    if all_cond is not sp.logic.true:
+        conditions.append(sp.Not(all_cond))
+        transitions.append({var: var for var in variables} | {nex[0]: nex[1]})
     rec = Recurrence({}, conditions, transitions, bounded_vars=arr_cf.bounded_vars)
     return rec
 
@@ -284,9 +283,9 @@ def flat_body_compound(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    # c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
+    c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
-    c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
+    # c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
