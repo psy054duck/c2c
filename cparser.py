@@ -120,6 +120,10 @@ class Vectorizer:
     def visit_For(self, node):
         self.loop_stack.append(1)
         init = self.visit(node.init)
+        old_table = self.symbol_table.copy()
+        # self.symbol_table = {}
+        for var_info in init:
+            self.symbol_table[var_info[0]] = var_info[1]
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
@@ -130,23 +134,37 @@ class Vectorizer:
         rec = for2rec(init, nex, stmt, filename=filename)
         if rec is None:
             rec = parse(filename)
-        rec.print()
         scalar_cf, array_cf = rec.solve_array()
         scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
         # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
         num_iter = compute_N(cond, scalar_cf)
+        print('#'*10)
+        rec.print()
+        print(cond)
+        print(self.symbol_table)
+        scalar_cf.pp_print()
+        print(num_iter)
+        print('#'*10)
         scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
-        array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
+        scalar_cf.pp_print()
+        array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
         array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
+        print('*'*10)
+        print(set(self.symbol_table))
+        print(set(old_table))
         considered = set()
-        # for closed_forms in array_cf.closed_forms:
-        #     not_considered = set(closed_forms) - considered
-        #     for var in not_considered:
-        #         considered.add(var)
-        #         for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
-        #             array_cf.add_constraint(bnd_var < bnd)
-        array_cf.simplify()
+        if 'i' in set(self.symbol_table) - set(old_table):
+            for closed_forms in array_cf.closed_forms:
+                not_considered = set(closed_forms) - considered
+                for var in not_considered:
+                    considered.add(var)
+                    for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
+                        array_cf.add_constraint(bnd_var < bnd)
+                        array_cf.add_constraint(bnd_var >= 0)
+            array_cf.simplify()
         res = scalar_cf, array_cf
+        array_cf.pp_print()
+        self.symbol_table = old_table
         return res
     
     def visit_If(self, node):
@@ -283,10 +301,10 @@ def flat_body_compound(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
+    # c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
-    # c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
+    c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
-    print(generator.visit(new_ast))
+    generator.visit(new_ast)

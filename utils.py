@@ -84,8 +84,11 @@ def to_z3(sp_expr):
         res = z3.Abs(to_z3(self.args[0]))
     elif isinstance(self, sp.Sum):
         s = z3.Function('Sum', z3.IntSort(), z3.IntSort(), z3.IntSort(), z3.IntSort(), z3.IntSort())
-        expr, (idx, start, end) = self.args
-        res = s(to_z3(expr), to_z3(idx), to_z3(start), to_z3(end))
+        # expr, (idx, start, end) = self.args
+        expr, *l = self.args
+        res = to_z3(expr)
+        for idx, start, end in l:
+            res = s(res, to_z3(idx), to_z3(start), to_z3(end))
     elif self is true:
         res = z3.BoolVal(True)
     elif self is false:

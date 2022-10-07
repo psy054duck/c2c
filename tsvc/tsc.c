@@ -3615,6 +3615,39 @@ int s273()
 	return 0;
 }
 
+int s273p()
+{
+
+//	control flow
+//	simple loop with dependent conditional
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s273 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < ntimes; nl++) {
+		for (int i = 0; i < LEN; i++) {
+			a[i]   = a[i] + d[i]   * e[i];
+			b[i]   = b[i] + d[i]   * e[i];
+			c[i]   = c[i] + a[i] * d[i];
+		}
+		// for (int i = 0; i < LEN; i+=4) {
+		// 	c[i]   = c[i] + a[i] * d[i];
+		// 	c[i+1] = c[i+1] + a[i+1] * d[i+1];
+		// 	c[i+2] = c[i+2] + a[i+2] * d[i+2];
+		// 	c[i+3] = c[i+3] + a[i+3] * d[i+3];
+		// }
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S273p\t %.2f \t\t", clock_dif_sec);;
+	check(123);
+	return 0;
+}
+
 // %2.7
 
 int s274()
@@ -6623,6 +6656,8 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
+	s273();
+	s273p();
 	// s252();
 	// s252p();
 	// s112();
@@ -6665,9 +6700,9 @@ int main(){
 	// s256();
 	// s256p();
 	// s256pp();
-	s231();
-	s231p();
-	s231pp();
+	// s231();
+	// s231p();
+	// s231pp();
 	// s231ppp();
 	// s276();
 	// s276p();

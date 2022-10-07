@@ -113,7 +113,7 @@ class Recurrence:
         arr_part_closed_form = arr_part_closed_form.subs({arr_part_closed_form.ind_var: self.ind_var})
         # arr_part_closed_form.pp_print()
         # mid = sp.Symbol('mid', integer=True)
-        arr_part_closed_form.add_constraint(sp.And(*[t >= 0 for t in t_list]))
+        # arr_part_closed_form.add_constraint(sp.And(*[t >= 0 for t in t_list]))
         # res = res.subs({self.ind_var: 800})
         arr_part_closed_form._simplify_conditions()
         array_closed_form = self._form_array_closed_form(arr_part_closed_form, array_func, t_list, acc)
@@ -147,15 +147,12 @@ class Recurrence:
         transitions = []
         new_conditions = []
         d = sp.Symbol('d_p', integer=True)
-        print(scalar_closed_form)
         scalar_closed_form = {var: scalar_closed_form[var].subs(Recurrence.neg_ind_var, d) for var in scalar_closed_form}
         acc_transitions = []
         for cond, trans in zip(self.conditions, self.transitions):
             t_trans = {var: get_app_by_var(var.func, trans[var]) for var in trans if self.arity.get(var, 0) >= 1}
             acc_terms = {var: trans[var] - t_trans[var] for var in t_trans}
-            print(acc_terms)
             # acc_terms = {var: acc_terms[var].subs(scalar_closed_form) for var in acc_terms}
-            print(acc_terms)
             for app in t_trans:
                 cond_arr = sp.And(*[sp.Eq(t, arg.subs(scalar_closed_form, simultaneous=True)) for t, arg in zip(t_list, app.args)])
                 new_conditions.append(sp.simplify(sp.And(cond.subs(scalar_closed_form), cond_arr)))
@@ -182,7 +179,6 @@ class Recurrence:
             return expr
         var = list(intersec_vars)[0]
         sol = sp.solve(t - t_expr, var, dict=True)
-        print(sol)
         res = expr
         if len(sol) == 1:
             res = expr.subs(sol[0])
@@ -271,6 +267,7 @@ class Recurrence:
                     assert(len(seq) == 1)
                     for i in seq:
                         acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
+                    print(acc)
                     res_closed_forms.append(closed | {sp.Symbol('_acc', integer=True): acc})
                 else:
                     res_closed_forms.append(closed)
