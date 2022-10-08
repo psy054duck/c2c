@@ -266,9 +266,12 @@ class Recurrence:
                 if acc_transition is not None:
                     assert(len(seq) == 1)
                     for i in seq:
-                        acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
-                    print(acc)
-                    res_closed_forms.append(closed | {sp.Symbol('_acc', integer=True): acc})
+                        if k is not sp.oo and k.is_constant():
+                            # acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
+                            acc += sum(acc_transition[i].subs(self.ind_var, acc_k + j) for j in range(len(seq)*k))
+                        else:
+                            acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
+                    res_closed_forms.append(closed | {sp.Symbol('_acc', integer=True): acc.doit()})
                 else:
                     res_closed_forms.append(closed)
                 acc_k += len(seq)*k
