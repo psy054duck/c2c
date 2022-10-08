@@ -260,6 +260,10 @@ def flat_body_inner_arr(body, nex):
     if all_cond is not sp.logic.true:
         conditions.append(sp.Not(all_cond))
         transitions.append({var: var for var in variables} | {nex[0]: nex[1]})
+    conditions = [cond.subs(Recurrence.neg_ind_var, sp.Symbol('_d0', integer=True)) for cond in conditions]
+    transitions = [{var: t[var].xreplace({Recurrence.neg_ind_var: sp.Symbol('_d0', integer=True)}) for var in t} for t in transitions]
+    print(transitions)
+    print('h'*100)
     rec = Recurrence({}, conditions, transitions, bounded_vars=arr_cf.bounded_vars)
     return rec
 
