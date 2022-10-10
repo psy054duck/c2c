@@ -4,8 +4,8 @@
 int test2() {
     int aa[N][N], bb[N][N];
 		for (int i = 0; i < N; ++i) {
-			for (int j = 1; j < N; j++) {
-				aa[j][i] = aa[j - 1][i] + bb[j][i];
+			for (int j = 0; j < N; j++) {
+				aa[j][i] = aa[j][i] + bb[j][i];
 			}
 		}
     return 0;

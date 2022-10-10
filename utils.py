@@ -1,5 +1,8 @@
 from ast import Constant
+from cmath import exp
 from lib2to3.pgen2.pgen import generate_grammar
+from unittest import expectedFailure
+from xml.dom import registerDOMImplementation
 import sympy as sp
 from sympy.logic.boolalg import true, false
 import z3
@@ -245,6 +248,27 @@ def z3_all_vars(expr):
             return reduce(lambda x, y: x.union(y), [z3_all_vars(ch) for ch in expr.children()])
         except:
             return set()
+
+def my_sp_simplify(expr, assumptions):
+    res = expr
+    if isinstance(expr, sp.Piecewise):
+        s = z3.Solver()
+        s.add(to_z3(assumptions))
+        remains = []
+        for e, cond in expr.args:
+            s.push()
+            s.add(to_z3(cond))
+            z3_res = s.check()
+            if z3_res == z3.sat:
+                remains.append((e, cond))
+            s.pop()
+        res = sp.Piecewise(*remains)
+    else:
+        try:
+            res = expr.func(*[my_sp_simplify(arg, assumptions) for arg in expr.args])
+        except:
+            pass
+    return res
 
 
 if __name__ == '__main__':

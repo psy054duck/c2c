@@ -1,5 +1,5 @@
-j = 1;
+j = 0;
 if (True) {
-	aa(j)(i) = aa(j - 1)(i) + bb(j)(i);
+	aa(j)(i) = aa(j)(i) + bb(j)(i);
 	j = j + 1;
 } 

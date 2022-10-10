@@ -3,7 +3,7 @@ from lzma import is_check_supported
 from re import sub
 import sympy as sp
 import z3
-from utils import to_z3, to_sympy, z3_deep_simplify, expr2c, get_app_by_var
+from utils import to_z3, to_sympy, z3_deep_simplify, expr2c, get_app_by_var, my_sp_simplify
 import pycparser.c_ast as c_ast
 from pycparser import c_generator
 import recurrence
@@ -18,9 +18,11 @@ class Closed_form:
         # self._simplify_conditions()
 
     def pp_print(self):
+        print('*'*100)
         for cond, closed_form in zip(self.conditions, self.closed_forms):
             for var in closed_form:
                 print('{:<100}{}'.format('%s = %s' % (var, closed_form[var]), cond))
+        print('*'*100)
                 # print('%s = %s\t%s' % (var, closed_form[var], cond))
 
     def subs(self, subs_dict):
@@ -110,6 +112,11 @@ class Closed_form:
 
     def simplify(self):
         self._simplify_conditions()
+        for i, cond in enumerate(self.conditions):
+            closed = self.closed_forms[i]
+            new_closed = {var: my_sp_simplify(closed[var], cond) for var in closed}
+            self.closed_forms[i] = new_closed
+
 
     def set_ind_var(self, ind_var):
         self.ind_var = ind_var

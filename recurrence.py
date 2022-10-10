@@ -5,7 +5,7 @@ import sympy as sp
 from sympy.logic.boolalg import Boolean, true, false
 import z3
 from closed_form import Closed_form
-from utils import to_z3, to_sympy, get_app_by_var, solve_k, z3_all_vars
+from utils import to_z3, to_sympy, get_app_by_var, solve_k, z3_all_vars, my_sp_simplify
 
 class Recurrence:
 
@@ -115,13 +115,20 @@ class Recurrence:
         # mid = sp.Symbol('mid', integer=True)
         # arr_part_closed_form.add_constraint(sp.And(*[t >= 0 for t in t_list]))
         # res = res.subs({self.ind_var: 800})
+        for cond in arr_part_closed_form.conditions:
+            t0 = sp.Symbol('_t0', integer=True)
+            t1 = sp.Symbol('_t1', integer=True)
+            print(sp.simplify(sp.And(t0 >= 0, t1 >= 0, t0 < 320000, t1 < 320000, cond.subs({sp.Symbol('_n', integer=True): 320000, sp.Symbol('i', integer=True): 0}))))
+        print('*'*10)
+        for closed in arr_part_closed_form.closed_forms:
+            print(closed)
         arr_part_closed_form._simplify_conditions()
         array_closed_form = self._form_array_closed_form(arr_part_closed_form, array_func, t_list, acc)
         return scalar_closed_form, array_closed_form
 
     def _form_array_closed_form(self, part_closed_form, arr_var, t_list, acc):
         arr_closed_forms = []
-        for closed in part_closed_form.closed_forms:
+        for closed, cond in zip(part_closed_form.closed_forms, part_closed_form.conditions):
             arr_app = arr_var(*[closed[t] for t in t_list]) + closed[acc]
             arr_closed_forms.append({arr_var(*t_list): arr_app})
         return Closed_form(part_closed_form.conditions, arr_closed_forms, self.ind_var, self.sum_end, t_list)

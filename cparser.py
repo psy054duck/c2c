@@ -138,20 +138,10 @@ class Vectorizer:
         scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
         # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
         num_iter = compute_N(cond, scalar_cf)
-        print('#'*10)
-        rec.print()
-        print(cond)
-        print(self.symbol_table)
-        scalar_cf.pp_print()
-        print(num_iter)
-        print('#'*10)
         scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
-        scalar_cf.pp_print()
         array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
         array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
-        print('*'*10)
-        print(set(self.symbol_table))
-        print(set(old_table))
+        # array_cf.pp_print()
         considered = set()
         if 'i' in set(self.symbol_table) - set(old_table):
             for closed_forms in array_cf.closed_forms:
@@ -161,6 +151,7 @@ class Vectorizer:
                     for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
                         array_cf.add_constraint(bnd_var < bnd)
                         array_cf.add_constraint(bnd_var >= 0)
+                        print(bnd_var, bnd)
             array_cf.simplify()
         res = scalar_cf, array_cf
         array_cf.pp_print()
