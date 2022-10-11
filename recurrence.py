@@ -103,26 +103,28 @@ class Recurrence:
         # t_list = self._prepare_t()
         scalar_rec = self.to_scalar()
         scalar_closed_form = scalar_rec.solve()
+        scalar_closed_form.simplify()
         neg_scalar_closed_form_sp = scalar_closed_form.subs({self.ind_var: self.ind_var - Recurrence.neg_ind_var - 1}).to_sympy()
         # new_conditions = [cond.subs(neg_scalar_closed_form_sp) for cond in self.conditions]
         new_rec, t_list, acc, array_var = self._t_transitions(neg_scalar_closed_form_sp)
         array_func = array_var.func
         # new_rec.add_constraint(to_z3(self.ind_var >= 0))
         new_rec.to_file(filename='tmp.txt')
+        new_rec.print()
         arr_part_closed_form = new_rec.solve()
         arr_part_closed_form = arr_part_closed_form.subs({arr_part_closed_form.ind_var: self.ind_var})
         # arr_part_closed_form.pp_print()
         # mid = sp.Symbol('mid', integer=True)
         # arr_part_closed_form.add_constraint(sp.And(*[t >= 0 for t in t_list]))
         # res = res.subs({self.ind_var: 800})
-        for cond in arr_part_closed_form.conditions:
-            t0 = sp.Symbol('_t0', integer=True)
-            t1 = sp.Symbol('_t1', integer=True)
-            print(sp.simplify(sp.And(t0 >= 0, t1 >= 0, t0 < 320000, t1 < 320000, cond.subs({sp.Symbol('_n', integer=True): 320000, sp.Symbol('i', integer=True): 0}))))
-        print('*'*10)
-        for closed in arr_part_closed_form.closed_forms:
-            print(closed)
-        arr_part_closed_form._simplify_conditions()
+        # for cond in arr_part_closed_form.conditions:
+        #     t0 = sp.Symbol('_t0', integer=True)
+        #     t1 = sp.Symbol('_t1', integer=True)
+        #     print(sp.simplify(sp.And(t0 >= 0, t1 >= 0, t0 < 320000, t1 < 320000, cond.subs({sp.Symbol('_n', integer=True): 320000, sp.Symbol('i', integer=True): 0}))))
+        # print('*'*10)
+        # for closed in arr_part_closed_form.closed_forms:
+        #     print(closed)
+        arr_part_closed_form.simplify()
         array_closed_form = self._form_array_closed_form(arr_part_closed_form, array_func, t_list, acc)
         return scalar_closed_form, array_closed_form
 
@@ -151,6 +153,7 @@ class Recurrence:
     def _t_transitions(self, scalar_closed_form):
         t_list, array_var = self._prepare_t()
         acc = sp.Symbol('_acc', integer=True)
+        e = sp.Symbol('_e', integer=True)
         transitions = []
         new_conditions = []
         d = sp.Symbol('d_p', integer=True)
@@ -278,6 +281,7 @@ class Recurrence:
                             acc += sum(acc_transition[i].subs(self.ind_var, acc_k + j) for j in range(len(seq)*k))
                         else:
                             acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
+                        print(acc)
                     res_closed_forms.append(closed | {sp.Symbol('_acc', integer=True): acc.doit()})
                 else:
                     res_closed_forms.append(closed)

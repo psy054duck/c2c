@@ -71,17 +71,37 @@ class Vectorizer:
             if isinstance(block_item, Decl):
                 self.symbol_table[b[0]] = b[1]
             elif isinstance(block_item, Assignment) and isinstance(b[1], int):
-                self.symbol_table[str(b[0])] = {'init': b[1]}# b[1]
+                self.symbol_table[b[0]] = b[1]
             else:
                 res.append(b)
             
-            if isinstance(block_item, For) and (len(self.loop_stack) == 0 or i == len(node.block_items) - 1 or b[1] is None):
-                pass
-                # new_blocks.extend(b[0])
+            if isinstance(block_item, For):
+                new_blocks.extend(b)
             else:
                 new_blocks.append(block_item)
         node.block_items = new_blocks
         return res
+    # def visit_Compound(self, node):
+    #     res = []
+    #     new_blocks = []
+    #     for i in range(len(node.block_items)):
+    #         block_item = node.block_items[i]
+    #         b = self.visit(block_item)
+    #         if isinstance(block_item, Decl):
+    #             self.symbol_table[b[0]] = b[1]
+    #         elif isinstance(block_item, Assignment) and isinstance(b[1], int):
+    #             self.symbol_table[str(b[0])] = {'init': b[1]}# b[1]
+    #         elif isinstance(block_item, For):
+    #             new_blocks.append(b)
+    #             res.append(b)
+    #         
+    #         # if isinstance(block_item, For) and (len(self.loop_stack) == 0 or i == len(node.block_items) - 1 or b[1] is None):
+    #         #     pass
+    #             # new_blocks.extend(b[0])
+    #         # else:
+    #         new_blocks.append(block_item)
+    #     node.block_items = new_blocks
+    #     return res
 
     def visit_BinaryOp(self, node):
         left = self.visit(node.left)
@@ -127,23 +147,23 @@ class Vectorizer:
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
-        self.loop_stack.pop()
-        # try:
-        filename = 'rec.txt'
-        considered = set()
-        rec = for2rec(init, nex, stmt, filename=filename)
-        if rec is None:
-            rec = parse(filename)
-        scalar_cf, array_cf = rec.solve_array()
-        scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
-        # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
-        num_iter = compute_N(cond, scalar_cf)
-        scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
-        array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
-        array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
-        # array_cf.pp_print()
-        considered = set()
-        if 'i' in set(self.symbol_table) - set(old_table):
+        try:
+            filename = 'rec.txt'
+            considered = set()
+            rec = for2rec(init, nex, stmt, filename=filename)
+            if rec is None:
+                rec = parse(filename)
+            rec.print()
+            scalar_cf, array_cf = rec.solve_array()
+            scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
+            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
+            num_iter = compute_N(cond, scalar_cf)
+            scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
+            array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
+            array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
+            # array_cf.pp_print()
+            considered = set()
+            # if 'i' in set(self.symbol_table) - set(old_table):
             for closed_forms in array_cf.closed_forms:
                 not_considered = set(closed_forms) - considered
                 for var in not_considered:
@@ -153,9 +173,13 @@ class Vectorizer:
                         array_cf.add_constraint(bnd_var >= 0)
                         print(bnd_var, bnd)
             array_cf.simplify()
-        res = scalar_cf, array_cf
-        array_cf.pp_print()
-        self.symbol_table = old_table
+            res = scalar_cf, array_cf
+            array_cf.pp_print()
+            self.symbol_table = old_table
+            self.loop_stack.pop()
+            res = array_cf.to_c()
+        except:
+            res = [node]
         return res
     
     def visit_If(self, node):
@@ -296,10 +320,13 @@ def flat_body_compound(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    # c_ast = parse_file('test.c', use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
+    test_file = 'test2.c'
+    try:
+        c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
-    c_ast = parse_file('test.c', use_cpp=True, cpp_args='-I./fake_libc_include')
+    except:
+        c_ast = parse_file(test_file, use_cpp=True, cpp_args='-I./fake_libc_include')
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
-    generator.visit(new_ast)
+    print(generator.visit(new_ast))

@@ -1,11 +1,7 @@
 from z3 import *
 
-_t0, _t1 = Ints('_t0 _t1')
-e = And((_t1 >= 0), (_t0 < 320000), (_t1 < 320000), Or((_t0 >= 319998), (_t1 > 319999), (_t1 < -1)), Or((_t1 > 319999), (_t1 < -1), Not(_t0 == 319999)))
-e = And(Or((_t1 < -1), Not(_t0 == 319999), (320000 - _t1 < 1)), Or((_t0 >= 319998), (_t0 < 0), (_t1 < -1), (320000 - _t1 < 1)))
-print(e)
-
-s = Solver()
-s.add(_t0 >= 0, _t1 >= 0, _t0 < 320000, _t1 < 320000)
-print(s.check(e))
-print(s.model())
+_n, _t0, _t1, i = Ints('_n _t0 _t1 i')
+e = And((_n >= 0), Or((_t0 <= 319998), (_t0 > 319999), (_t1 < i)))
+sim = Tactic('ctx-solver-simplify')
+e2 = Or(_t0 <= 319998, _t0 > 319999)
+print(sim(e2))

@@ -168,8 +168,10 @@ def get_app_by_var(var, expr):
 
 def expr2c(expr: sp.Expr):
     if isinstance(expr, sp.Add):
-        assert(len(expr.args) == 2)
+        # assert(len(expr.args) == 2)
         res = ast.BinaryOp('+', expr2c(expr.args[0]), expr2c(expr.args[1]))
+        for i in range(2, len(expr.args)):
+            res = ast.BinaryOp('+', res, expr2c(expr.args[i]))
     elif isinstance(expr, sp.Mul):
         assert(len(expr.args) == 2)
         res = ast.BinaryOp('*', expr2c(expr.args[0]), expr2c(expr.args[1]))
