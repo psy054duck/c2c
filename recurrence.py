@@ -12,7 +12,7 @@ class Recurrence:
     inductive_var = sp.Symbol('_n', integer=True)
     neg_ind_var = sp.Symbol('_d', integer=True)
 
-    def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]], ind_var=sp.Symbol('_n', integer=True), acc_transitions=None, bounded_vars=None):
+    def __init__(self, inits: dict[sp.Symbol, sp.Expr], conditions: list[Boolean], transitions: list[dict[sp.Symbol, sp.Expr]], ind_var=sp.Symbol('_n', integer=True), acc_transitions=None, e_transitions=None, bounded_vars=None):
         self.ind_var = ind_var
         self.bounded_vars = bounded_vars
         self.conditions = [conditions[0]]
@@ -24,6 +24,7 @@ class Recurrence:
         self.variables = reduce(set.union, [set(k for k in t.keys()) for t in transitions])
         self.variables = self.variables.union(reduce(set.union, [cond.free_symbols for cond in self.conditions]))
         self.acc_transitions = acc_transitions
+        self.e_transitions = e_transitions
         self._combine_branches()
         self.inits = {var: inits[var] for var in inits if var in self.variables}
         self.sum_end = sp.Symbol('sum_end', integer=True)
@@ -259,14 +260,14 @@ class Recurrence:
                 closed_form = {var: closed_forms[i][var].subs(subs_pairs1, simultaneous=True).subs(subs_pairs2, simultaneous=True) for var in closed_forms[i]}
                 closed_forms[i] = closed_form
             res_ks_sympy = [sp.simplify(subs_pairs1[var].subs(subs_pairs2, simultaneous=True)) for var in ks]
-            tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy, index_seq, self.acc_transitions))
+            tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy, index_seq, self.acc_transitions, self.e_transitions))
         res = self._tot_closed_form2class(tot_closed_form)
         return res
         
     def _tot_closed_form2class(self, tot_closed_forms):
         conditions = []
         res_closed_forms = []
-        for closed_forms, cond, ks, index_seq, acc_transition in tot_closed_forms:
+        for closed_forms, cond, ks, index_seq, acc_transition, e_transitions in tot_closed_forms:
             # prev_k = 0
             # prev_seq = []
             acc_k = 0
@@ -276,12 +277,12 @@ class Recurrence:
                 if acc_transition is not None:
                     assert(len(seq) == 1)
                     for i in seq:
+                        e = e_transitions[i]
                         if k is not sp.oo and k.is_constant():
                             # acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
-                            acc += sum(acc_transition[i].subs(self.ind_var, acc_k + j) for j in range(len(seq)*k))
+                            acc = e*acc + sum(acc_transition[i].subs(self.ind_var, acc_k + j) for j in range(len(seq)*k))
                         else:
-                            acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
-                        print(acc)
+                            acc = e* acc + sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
                     res_closed_forms.append(closed | {sp.Symbol('_acc', integer=True): acc.doit()})
                 else:
                     res_closed_forms.append(closed)
