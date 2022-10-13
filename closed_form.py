@@ -85,9 +85,10 @@ class Closed_form:
                     # print(self.conditions[j])
                     # print(z3.Not(to_z3(self.closed_forms[i][var]) == to_z3(self.closed_forms[j][var])))
                     # print('*'*10)
-                    if s.check() == z3.sat:
-                        break
+                    check_res = s.check()
                     s.pop()
+                    if check_res == z3.sat:
+                        break
                 else:
                     # new_closed_forms.append(self.closed_forms[i])
                     # new_conditions.append(z3.Or(self.conditions[i], self.conditions[j]))
@@ -101,10 +102,12 @@ class Closed_form:
         new_conditions = []
         absorbed = reduce(set.union, (merged[idx] for idx in merged))
         for i in merged:
-            if i in absorbed: continue
             cur_condition = to_sympy(z3_deep_simplify(z3.And(z3.BoolVal(True), *sim(to_z3(sp.Or(self.conditions[i], *[self.conditions[j] for j in merged[i]])))[0])))
-            new_closed_forms.append(self.closed_forms[i])
-            new_conditions.append(cur_condition)
+            if i not in absorbed:
+                new_closed_forms.append(self.closed_forms[i])
+                new_conditions.append(cur_condition)
+            else:
+                self.conditions[i] = cur_condition
         self.closed_forms = new_closed_forms
         self.conditions = new_conditions
         if len(absorbed) != 0:
@@ -151,17 +154,18 @@ class Closed_form:
         return res
 
     def to_c_scalar(self):
+        block_items = []
         for cond in self.conditions:
-            block_items = []
             if cond is sp.S.true:
                 for closed_form in self.closed_forms:
                     for var in closed_form:
-                        lhs = expr2c(var)
-                        rhs = expr2c(closed_form[var])
-                        assignment = c_ast.Assignment('=', lhs, rhs)
-                        block_items.append(assignment)
-                res = c_ast.Compound(block_items)
-        return res
+                        if len(var.args) == 0:
+                            lhs = expr2c(var)
+                            rhs = expr2c(closed_form[var])
+                            assignment = c_ast.Assignment('=', lhs, rhs)
+                            block_items.append(assignment)
+                # res = c_ast.Compound(block_items)
+        return block_items
 
     def is_splitable(self):
         try:
@@ -183,6 +187,8 @@ class Closed_form:
             interval = cond.as_set()
             left = interval.inf
             right = interval.sup
+            print(interval)
+            print(right)
             if not interval.contains(left):
                 left = left + 1
             if interval.contains(right):

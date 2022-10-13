@@ -3091,10 +3091,15 @@ int s2244p()
 	start_t = clock();
 
 	for (int nl = 0; nl < ntimes; nl++) {
-		for (int i = 0; i < LEN-1; i++) {
-			a[i+1] = a[i+1] + b[i] + e[i];
-			a[i] = a[i] + b[i] + c[i];
-		}
+		for (int _t0 = 0; _t0 < LEN-1; _t0++)
+    	{
+    	  a[_t0] = b[_t0] + c[_t0];
+    	}
+
+    	for (int _t0 = LEN-1; _t0 < LEN; _t0++)
+    	{
+    	  a[_t0] = b[LEN-2] + e[LEN-2];
+    	}
 		dummy(a, b, c, d, e, aa, bb, cc, 0.);
 	}
 	end_t = clock(); clock_dif = end_t - start_t;
@@ -3104,36 +3109,6 @@ int s2244p()
 	return 0;
 }
 
-int s2244pp()
-{
-
-//	node splitting
-//	cycle with ture and anti dependency
-
-	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
-
-
-	init( "s244 ");
-	start_t = clock();
-
-	for (int nl = 0; nl < ntimes; nl++) {
-		for (int _t0 = 0; _t0 < LEN-2; _t0++)
-    	{
-    	  a[_t0] = (((a[_t0] + b[_t0]) + b[-1 + _t0]) + c[_t0]) + e[-1 + _t0];
-    	}
-
-    	for (int _t0 = LEN-1; _t0 < LEN; _t0++)
-    	{
-    	  a[_t0] = (a[_t0] + b[LEN-2]) + e[LEN-2];
-    	}
-		dummy(a, b, c, d, e, aa, bb, cc, 0.);
-	}
-	end_t = clock(); clock_dif = end_t - start_t;
-	clock_dif_sec = (double) (clock_dif/1000000.0);
-	printf("S2244pp\t %.2f \t\t", clock_dif_sec);;
-	check(12);
-	return 0;
-}
 
 
 
@@ -6715,9 +6690,8 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	// s2244();
+	s2244();
 	s2244p();
-	s2244pp();
 	// s273();
 	// s273p();
 	// s252();

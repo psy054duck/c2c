@@ -71,7 +71,7 @@ class Vectorizer:
             if isinstance(block_item, Decl):
                 self.symbol_table[b[0]] = b[1]
             elif isinstance(block_item, Assignment) and isinstance(b[1], int):
-                self.symbol_table[b[0]] = b[1]
+                self.symbol_table[str(b[0])] = {'init': b[1]}
             else:
                 res.append(b)
             
@@ -140,7 +140,8 @@ class Vectorizer:
     def visit_For(self, node):
         self.loop_stack.append(1)
         init = self.visit(node.init)
-        old_table = self.symbol_table.copy()
+        old_table = {}
+        # old_table = self.symbol_table.copy()
         # self.symbol_table = {}
         for var_info in init:
             self.symbol_table[var_info[0]] = var_info[1]
@@ -161,7 +162,6 @@ class Vectorizer:
             scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
             array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
             array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
-            # array_cf.pp_print()
             considered = set()
             # if 'i' in set(self.symbol_table) - set(old_table):
             for closed_forms in array_cf.closed_forms:
@@ -171,13 +171,12 @@ class Vectorizer:
                     for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
                         array_cf.add_constraint(bnd_var < bnd)
                         array_cf.add_constraint(bnd_var >= 0)
-                        print(bnd_var, bnd)
             array_cf.simplify()
             res = scalar_cf, array_cf
             array_cf.pp_print()
             self.symbol_table = old_table
             self.loop_stack.pop()
-            res = array_cf.to_c()
+            res = array_cf.to_c() + scalar_cf.to_c()
         except:
             res = [node]
         return res
@@ -277,8 +276,6 @@ def flat_body_inner_arr(body, nex):
         transitions.append({var: var for var in variables} | {nex[0]: nex[1]})
     conditions = [cond.subs(Recurrence.neg_ind_var, sp.Symbol('_d0', integer=True)) for cond in conditions]
     transitions = [{var: t[var].xreplace({Recurrence.neg_ind_var: sp.Symbol('_d0', integer=True)}) for var in t} for t in transitions]
-    print(transitions)
-    print('h'*100)
     rec = Recurrence({}, conditions, transitions, bounded_vars=arr_cf.bounded_vars)
     return rec
 
@@ -320,7 +317,7 @@ def flat_body_compound(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    test_file = 'test2.c'
+    test_file = 'test/test2.c'
     try:
         c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
@@ -329,4 +326,5 @@ if __name__ == '__main__':
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
-    print(generator.visit(new_ast))
+    res = generator.visit(new_ast)
+    print(res)

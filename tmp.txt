@@ -1,11 +1,15 @@
 d_p = 0;
+_e = 1;
 if (Eq(_n, _t0 + d_p)) {
 	_t0 = _t0;
 	d_p = d_p + 1;
+	_e = 0;
 } else if (Ne(_n, _t0 + d_p) & Eq(-_n + _t0 + d_p, -1)) {
 	_t0 = _t0;
 	d_p = d_p + 1;
+	_e = 0;
 } else if (Ne(_n, _t0 + d_p) & Ne(-_n + _t0 + d_p, -1)) {
 	_t0 = _t0;
 	d_p = d_p + 1;
+	_e = _e;
 } 

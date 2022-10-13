@@ -1,6 +1,6 @@
 i = 0;
 if (True) {
-	a(i + 1) = a(i + 1) + b(i) + e(i);
-	a(i) = a(i) + b(i) + c(i);
+	a(i + 1) = b(i) + e(i);
+	a(i) = b(i) + c(i);
 	i = i + 1;
 } 
