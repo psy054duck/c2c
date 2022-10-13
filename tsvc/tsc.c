@@ -3347,6 +3347,36 @@ int s254()
 	return 0;
 }
 
+int s254p()
+{
+
+//	scalar and array expansion
+//	carry around variable
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s254 ");
+	start_t = clock();
+
+	float x;
+	for (int nl = 0; nl < 4*ntimes; nl++) {
+		x = b[LEN-1];
+		a[0] = (b[0] + b[LEN-1]) * (float).5;
+
+		for (int i = 4; i < LEN; i++) {
+			a[i] = (b[i] + b[i-1]) * (float).5;
+		}
+		x = b[LEN-1];
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S254p\t %.2f \t\t", clock_dif_sec);;
+	check(1);
+	return 0;
+}
+
 // %2.5
 
 int s255()
@@ -6690,8 +6720,11 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	s2244();
-	s2244p();
+	s256();
+	s256p();
+	s256pp();
+	// s2244();
+	// s2244p();
 	// s273();
 	// s273p();
 	// s252();
