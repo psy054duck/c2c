@@ -1,6 +1,5 @@
-i = 0;
+j = 0;
 if (True) {
-	a(i + 1) = b(i) + e(i);
-	a(i) = b(i) + c(i);
-	i = i + 1;
+	cc(j)(i) = a(j) + bb(j)(i)*d(j);
+	j = j + 1;
 } 

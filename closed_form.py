@@ -187,8 +187,6 @@ class Closed_form:
             interval = cond.as_set()
             left = interval.inf
             right = interval.sup
-            print(interval)
-            print(right)
             if not interval.contains(left):
                 left = left + 1
             if interval.contains(right):

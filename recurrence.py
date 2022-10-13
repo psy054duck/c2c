@@ -445,7 +445,9 @@ class Recurrence:
             x += cell_x
             y += cell_y
         # matrix_closed_form = (P*middle*P.inv()).subs(3**ind_var, 3).subs(0**ind_var, 0)
-        matrix_closed_form = (P*middle*P.inv()).subs(0**ind_var, 0)
+        matrix_closed_form = P*middle*P.inv()
+        if 0**ind_var in matrix_closed_form:
+            matrix_closed_form = matrix_closed_form.subs(0**ind_var, 0)
         linear_form = Recurrence.matrix2linear(ordered_vars, matrix_closed_form)
         if matrix_form.rank() != matrix_form.shape[0]:
             # linear_form = {var: sp.Piecewise((var, sp.Eq(ind_var, 0)), (linear_form[var], True)) if linear_form[var].subs(ind_var, 0) != var else linear_form[var] for var in linear_form}

@@ -148,37 +148,37 @@ class Vectorizer:
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
-        try:
-            filename = 'rec.txt'
-            considered = set()
-            rec = for2rec(init, nex, stmt, filename=filename)
-            if rec is None:
-                rec = parse(filename)
-            rec.print()
-            scalar_cf, array_cf = rec.solve_array()
-            scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
-            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
-            num_iter = compute_N(cond, scalar_cf)
-            scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
-            array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
-            array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
-            considered = set()
-            # if 'i' in set(self.symbol_table) - set(old_table):
-            for closed_forms in array_cf.closed_forms:
-                not_considered = set(closed_forms) - considered
-                for var in not_considered:
-                    considered.add(var)
-                    for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
-                        array_cf.add_constraint(bnd_var < bnd)
-                        array_cf.add_constraint(bnd_var >= 0)
-            array_cf.simplify()
-            res = scalar_cf, array_cf
-            array_cf.pp_print()
-            self.symbol_table = old_table
-            self.loop_stack.pop()
-            res = array_cf.to_c() + scalar_cf.to_c()
-        except:
-            res = [node]
+        # try:
+        filename = 'rec.txt'
+        considered = set()
+        rec = for2rec(init, nex, stmt, filename=filename)
+        if rec is None:
+            rec = parse(filename)
+        rec.print()
+        scalar_cf, array_cf = rec.solve_array()
+        scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
+        # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
+        num_iter = compute_N(cond, scalar_cf)
+        scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
+        array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
+        array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
+        considered = set()
+        # if 'i' in set(self.symbol_table) - set(old_table):
+        for closed_forms in array_cf.closed_forms:
+            not_considered = set(closed_forms) - considered
+            for var in not_considered:
+                considered.add(var)
+                for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
+                    array_cf.add_constraint(bnd_var < bnd)
+                    array_cf.add_constraint(bnd_var >= 0)
+        array_cf.simplify()
+        res = scalar_cf, array_cf
+        array_cf.pp_print()
+        self.symbol_table = old_table
+        self.loop_stack.pop()
+        res = array_cf.to_c() + scalar_cf.to_c()
+        # except:
+        #     res = [node]
         return res
     
     def visit_If(self, node):
@@ -317,7 +317,7 @@ def flat_body_compound(body):
     return res_cond, res_stmt
 
 if __name__ == '__main__':
-    test_file = 'test/test2.c'
+    test_file = 'test/test5.c'
     try:
         c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
