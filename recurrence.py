@@ -5,7 +5,7 @@ import sympy as sp
 from sympy.logic.boolalg import Boolean, true, false
 import z3
 from closed_form import Closed_form
-from utils import to_z3, to_sympy, get_app_by_var, solve_k, z3_all_vars, my_sp_simplify
+from utils import check_conditions_consistency, to_z3, to_sympy, get_app_by_var, solve_k, z3_all_vars, my_sp_simplify
 
 class Recurrence:
 
@@ -180,6 +180,7 @@ class Recurrence:
                 # e_transitions.append(e_trans[app])
                 # transitions.append(new_trans | {d: d + 1})
         new_conditions.append(sp.simplify(sp.Not(sp.Or(*[cond for cond in new_conditions]))))
+
         transitions.append({t: t for t in t_list} | {d: d + 1} | {e: e})
         acc_transitions.append(0)
         # e_transitions.append(1)
@@ -266,7 +267,15 @@ class Recurrence:
                 closed_form = {var: closed_forms[i][var].subs(subs_pairs1, simultaneous=True).subs(subs_pairs2, simultaneous=True) for var in closed_forms[i]}
                 closed_forms[i] = closed_form
             res_ks_sympy = [sp.simplify(subs_pairs1[var].subs(subs_pairs2, simultaneous=True)) for var in ks]
-            tot_closed_form.append((closed_forms, to_sympy(constraint), res_ks_sympy, index_seq, self.acc_transitions))
+            constraint_sp = to_sympy(constraint)
+            debug_s = z3.Solver()
+            res1 = debug_s.check(constraint, z3.Not(to_z3(to_sympy(constraint))))
+            res2 = debug_s.check(z3.Not(constraint), to_z3(to_sympy(constraint)))
+            if res1 == z3.sat or res2 == z3.sat:
+                print(constraint)
+                print(to_sympy(constraint))
+
+            tot_closed_form.append((closed_forms, constraint_sp, res_ks_sympy, index_seq, self.acc_transitions))
         res = self._tot_closed_form2class(tot_closed_form)
         return res
         

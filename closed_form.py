@@ -1,6 +1,4 @@
 from functools import reduce
-from lzma import is_check_supported
-from re import sub
 import sympy as sp
 import z3
 from utils import to_z3, to_sympy, z3_deep_simplify, expr2c, get_app_by_var, my_sp_simplify
@@ -119,7 +117,6 @@ class Closed_form:
             closed = self.closed_forms[i]
             new_closed = {var: my_sp_simplify(closed[var], cond) for var in closed}
             self.closed_forms[i] = new_closed
-
 
     def set_ind_var(self, ind_var):
         self.ind_var = ind_var

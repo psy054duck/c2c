@@ -9,6 +9,22 @@ import z3
 from functools import reduce
 import pycparser.c_ast as ast
 
+def check_conditions_consistency(conditions):
+    s = z3.Solver()
+    for i, cond1 in enumerate(conditions):
+        for j, cond2 in enumerate(conditions):
+            if i >= j: continue
+            try:
+                res = s.check(to_z3(sp.And(cond1, cond2)))
+            except:
+                res = s.check(z3.And(cond1, cond2))
+            print(res)
+            if res == z3.sat:
+                print(cond1)
+                print(cond2)
+                print(s.model())
+    print('*'*100)
+
 def z3_deep_simplify(expr):
     # print(expr)
     sim = z3.Tactic('ctx-solver-simplify')
@@ -144,7 +160,8 @@ def to_sympy(expr):
         res = sp.Not(to_sympy(children[0]))
     elif z3.is_and(expr):
         children = expr.children()
-        res = sp.And(*[to_sympy(ch) for ch in children])
+        body = [to_sympy(ch) for ch in children]
+        res = sp.And(*body)
     elif z3.is_or(expr):
         children = expr.children()
         res = sp.Or(*[to_sympy(ch) for ch in children])
