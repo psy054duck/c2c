@@ -141,7 +141,7 @@ class Closed_form:
                         return {var: closed_form[var].subs(values) for var in closed_form}
         raise Exception('fail')
 
-    def to_c(self):
+    def to_c(self, dim_info):
         self._reorder_conditions()
         # self.pp_print()
         if self.is_splitable() and self.bounded_vars is not None:
@@ -149,7 +149,7 @@ class Closed_form:
         elif self.bounded_vars is None:
             res = self.to_c_scalar()
         else:
-
+            res = self.to_c_general(dim_info)
         return res
     
     def to_c_scalar(self):
@@ -206,6 +206,42 @@ class Closed_form:
                     loops.append(for_loop)
         return loops
                     # print(generator.visit(for_loop))
+    def to_c_general(self, symbol_table):
+        assert(len(self.conditions) == 1)
+        closed, _ = self.closed_forms[0], self.conditions[0]
+        stmt_list = []
+        loops = []
+        for var in closed:
+            idx = [c_ast.ID(str(t)) for t in var.args]
+            assignment = c_ast.Assignment('=', c_ast.ArrayRef(c_ast.ID(str(var.func)), *idx), expr2c(closed[var]))
+            stmt_list.append(assignment)
+            stmt = c_ast.Compound(stmt_list)
+            for t, bnd in reversed(list(zip(var.args, symbol_table[str(var.func)]['type'][1]))):
+                decl = c_ast.Decl(str(t), None, None, None, None, c_ast.TypeDecl(str(t), [], None, c_ast.IdentifierType(['int'])), c_ast.Constant('int', str(0)), None)
+                init = c_ast.DeclList([decl])
+                cond = c_ast.BinaryOp('<', c_ast.ID(str(t)), c_ast.Constant('int', str(bnd)))
+                nex = c_ast.UnaryOp('p++', c_ast.ID(str(t)))
+                stmt = c_ast.For(init, cond, nex, stmt)
+            loops.append(stmt)
+        return loops
+
+
+
+
+
+        # for var in closed:
+        #     if len(var.args) > 0:
+        #         for t in var.args:
+        #             decl = c_ast.Decl(str(t), None, None, None, None, c_ast.TypeDecl(str(t), [], None, c_ast.IdentifierType(['int'])), c_ast.Constant('int', str(0)), None)
+        #             init = c_ast.DeclList([decl])
+        #             cond = c_ast.BinaryOp('<', c_ast.ID(str(t)), c_ast.Constant('int', str(dim_info[t])))
+        #             nex = c_ast.UnaryOp('p++', c_ast.ID(str(t)))
+        #             # assignment = c_ast.Assignment('=', c_ast.ArrayRef(c_ast.ID(str(var.func)), c_ast.ID(str(t))), expr2c(closed[var]))
+        #             stmt = c_ast.Compound([assignment])
+        #             for_loop = c_ast.For(init, cond, nex, stmt)
+
+
+
 
     def to_rec(self, scalar_closed_forms):
         assert(self.bounded_vars is not None)

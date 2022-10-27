@@ -215,9 +215,9 @@ def expr2c(expr: sp.Expr):
     elif isinstance(expr, sp.Integer) or isinstance(expr, int):
         res = ast.Constant('int', str(expr))
     elif expr.is_Function:
-        assert(len(expr.args) == 1)
-        arg = expr.args[0]
-        res = ast.ArrayRef(ast.ID(str(expr.func)), expr2c(arg))
+        # assert(len(expr.args) == 1)
+        # arg = expr.args[0]
+        res = ast.ArrayRef(ast.ID(str(expr.func)), *[expr2c(arg) for arg in expr.args])
     elif isinstance(expr, sp.Symbol):
         res = ast.ID(str(expr))
     else:
