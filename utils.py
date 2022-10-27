@@ -34,13 +34,33 @@ def z3_deep_simplify(expr):
     for cond in cond_list:
         sp_cond = to_sympy(cond)
         if len(sp_cond.free_symbols) == 1:
-            try:
-                new_cond = to_z3(sp_cond.as_set().as_relational(list(sp_cond.free_symbols)[0]))
-                new_cond_list.append(new_cond)
-            except:
-                new_cond_list.append(to_z3(sp_cond))
-        else:
-            new_cond_list.append(to_z3(sp_cond))
+            t = to_z3(list(sp_cond.free_symbols)[0])
+            s = z3.Solver()
+            z3_min, z3_max = z3.Ints('z3_min, z3_max')
+            s.push()
+            s.add(z3.ForAll(t, z3.Implies(z3.And(t <= z3_max), cond)))
+            s.add(z3.ForAll(t, z3.Implies(cond, z3.And(t <= z3_max))))
+            if s.check() == z3.sat:
+                model = s.model()
+                new_cond_list.append(t <= model.eval(z3_max))
+                continue
+            s.pop()
+            s.push()
+            s.add(z3.ForAll(t, z3.Implies(z3.And(t >= z3_min), cond)))
+            s.add(z3.ForAll(t, z3.Implies(cond, z3.And(t >= z3_min))))
+            if s.check() == z3.sat:
+                model = s.model()
+                new_cond_list.append(t >= model.eval(z3_min))
+                continue
+            s.pop()
+            s.push()
+            s.add(z3.ForAll(t, z3.Implies(z3.And(z3_min <= t, t <= z3_max), cond)))
+            s.add(z3.ForAll(t, z3.Implies(cond, z3.And(z3_min <= t, t <= z3_max))))
+            if s.check() == z3.sat:
+                model = s.model()
+                new_cond_list.append(z3.And(model.eval(z3_min) <= t, t <= model.eval(z3_max)))
+                continue
+        new_cond_list.append(to_z3(sp_cond))
     cond_list = new_cond_list
 
     if len(cond_list) == 0:
@@ -287,7 +307,7 @@ def my_sp_simplify(expr, assumptions):
             res = expr.func(*[my_sp_simplify(arg, assumptions) for arg in expr.args])
         except:
             pass
-    return res
+    return sp.simplify(res)
 
 
 if __name__ == '__main__':

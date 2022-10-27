@@ -268,12 +268,12 @@ class Recurrence:
                 closed_forms[i] = closed_form
             res_ks_sympy = [sp.simplify(subs_pairs1[var].subs(subs_pairs2, simultaneous=True)) for var in ks]
             constraint_sp = to_sympy(constraint)
-            debug_s = z3.Solver()
-            res1 = debug_s.check(constraint, z3.Not(to_z3(to_sympy(constraint))))
-            res2 = debug_s.check(z3.Not(constraint), to_z3(to_sympy(constraint)))
-            if res1 == z3.sat or res2 == z3.sat:
-                print(constraint)
-                print(to_sympy(constraint))
+            # debug_s = z3.Solver()
+            # res1 = debug_s.check(constraint, z3.Not(to_z3(to_sympy(constraint))))
+            # res2 = debug_s.check(z3.Not(constraint), to_z3(to_sympy(constraint)))
+            # if res1 == z3.sat or res2 == z3.sat:
+            #     print(constraint)
+            #     print(to_sympy(constraint))
 
             tot_closed_form.append((closed_forms, constraint_sp, res_ks_sympy, index_seq, self.acc_transitions))
         res = self._tot_closed_form2class(tot_closed_form)

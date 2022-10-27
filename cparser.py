@@ -4,9 +4,16 @@ from pycparser import parse_file, c_generator
 from pycparser.c_ast import *
 import sympy as sp
 from parser import parse
-from utils import compute_N, check_conditions_consistency
+from utils import compute_N, check_conditions_consistency, z3_deep_simplify
 from closed_form import Closed_form
 from recurrence import Recurrence
+
+# old_piecewise_eval_simplify = sp.Piecewise._eval_simplify
+# def new_piecewise_eval_simplify(self, **kwargs):
+#     print('hhh')
+#     return old_piecewise_eval_simplify(self, **kwargs)
+# 
+# sp.Piecewise._eval_simplify = new_piecewise_eval_simplify
 
 class Vectorizer:
     def __init__(self):
@@ -145,8 +152,6 @@ class Vectorizer:
         return res
 
     def visit_For(self, node):
-        self.loop_stack.append(1)
-        print(len(self.loop_stack))
         init = self.visit(node.init)
         old_table = {}
         old_table = self.symbol_table.copy()
@@ -188,9 +193,12 @@ class Vectorizer:
         res = scalar_cf, array_cf
         array_cf.pp_print()
         self.symbol_table = old_table
-        self.loop_stack.pop()
+        self.loop_stack.append(1)
         # res = array_cf.to_c() + scalar_cf.to_c()
-        res = scalar_cf, array_cf
+        if len(self.loop_stack) == 2:
+            res = array_cf.to_c() + scalar_cf.to_c()
+        else:
+            res = scalar_cf, array_cf
         # except:
         #     res = [node]
         return res

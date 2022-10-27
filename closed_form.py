@@ -148,8 +148,10 @@ class Closed_form:
             res = self.to_c_split()
         elif self.bounded_vars is None:
             res = self.to_c_scalar()
-        return res
+        else:
 
+        return res
+    
     def to_c_scalar(self):
         block_items = []
         for cond in self.conditions:
