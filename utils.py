@@ -217,7 +217,11 @@ def expr2c(expr: sp.Expr):
     elif expr.is_Function:
         # assert(len(expr.args) == 1)
         # arg = expr.args[0]
-        res = ast.ArrayRef(ast.ID(str(expr.func)), *[expr2c(arg) for arg in expr.args])
+        array_ref = ast.ArrayRef(ast.ID(str(expr.func)), expr2c(expr.args[0]))
+        for i in range(1, len(expr.args)):
+            array_ref = ast.ArrayRef(array_ref, expr2c(expr.args[i]))
+        res = array_ref
+        # res = ast.ArrayRef(ast.ID(str(expr.func)), *[expr2c(arg) for arg in expr.args])
     elif isinstance(expr, sp.Symbol):
         res = ast.ID(str(expr))
     else:

@@ -15,6 +15,12 @@ class Closed_form:
         self.sum_end = sum_end
         # self._simplify_conditions()
 
+    def remove_vars(self, vars):
+        for i in range(len(self.closed_forms)):
+            closed = self.closed_forms[i]
+            closed = {var: closed[var] for var in closed if var not in vars}
+            self.closed_forms[i] = closed
+
     def pp_print(self):
         print('*'*100)
         for cond, closed_form in zip(self.conditions, self.closed_forms):
@@ -205,18 +211,22 @@ class Closed_form:
                     for_loop = c_ast.For(init, cond, nex, stmt)
                     loops.append(for_loop)
         return loops
-                    # print(generator.visit(for_loop))
+
     def to_c_general(self, symbol_table):
         assert(len(self.conditions) == 1)
         closed, _ = self.closed_forms[0], self.conditions[0]
-        stmt_list = []
+        # stmt_list = []
         loops = []
         for var in closed:
-            idx = [c_ast.ID(str(t)) for t in var.args]
-            assignment = c_ast.Assignment('=', c_ast.ArrayRef(c_ast.ID(str(var.func)), *idx), expr2c(closed[var]))
-            stmt_list.append(assignment)
-            stmt = c_ast.Compound(stmt_list)
+            # idx = [c_ast.ID(str(t)) for t in var.args]
+            # array_ref = c_ast.ArrayRef(c_ast.ID(str(var.func)), idx[0])
+            # for i in range(1, len(idx)):
+            #     array_ref = c_ast.ArrayRef(array_ref, idx[i])
+            stmt = c_ast.Assignment('=', expr2c(var), expr2c(closed[var]))
+            # stmt_list.append(assignment)
+            # stmt = c_ast.Compound(stmt_list)
             for t, bnd in reversed(list(zip(var.args, symbol_table[str(var.func)]['type'][1]))):
+                stmt = c_ast.Compound([stmt])
                 decl = c_ast.Decl(str(t), None, None, None, None, c_ast.TypeDecl(str(t), [], None, c_ast.IdentifierType(['int'])), c_ast.Constant('int', str(0)), None)
                 init = c_ast.DeclList([decl])
                 cond = c_ast.BinaryOp('<', c_ast.ID(str(t)), c_ast.Constant('int', str(bnd)))

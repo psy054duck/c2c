@@ -3500,6 +3500,63 @@ int s256pp()
 	return 0;
 }
 
+int s256s()
+{
+
+//	scalar and array expansion
+//	array expansion
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s256 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
+		for (int i = 0; i < LEN2; i++) {
+			for (int j = 1; j < LEN2; j++) {
+				cc[j][i] = a[j] + bb[j][i]*d[j];
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S256s\t %.2f \t\t", clock_dif_sec);;
+	check(111);
+	return 0;
+}
+
+int s256sp()
+{
+
+//	scalar and array expansion
+//	array expansion
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s256 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
+		for (int _t0 = 0; _t0 < LEN2; _t0++)
+    {
+      for (int _t1 = 0; _t1 < LEN2; _t1++)
+      {
+        cc[_t0][_t1] = (bb[_t0][_t1] * d[_t0]) + a[_t0];
+      }
+
+    }
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S256sp\t %.2f \t\t", clock_dif_sec);;
+	check(111);
+	return 0;
+}
+
 // %2.5
 
 int s257()
@@ -6720,9 +6777,13 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	s256();
-	s256p();
-	s256pp();
+	s1112();
+	s1112p();
+	// s256s();
+	// s256sp();
+	// s256();
+	// s256p();
+	// s256pp();
 	// s2244();
 	// s2244p();
 	// s273();
