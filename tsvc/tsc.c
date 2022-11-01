@@ -968,6 +968,7 @@ int s1112p()
 	
 
 	init("s112 ");
+	
 	start_t = clock();
 
 	for (int nl = 0; nl < ntimes*5; nl++) {

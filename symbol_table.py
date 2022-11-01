@@ -13,8 +13,8 @@ class SymbolTable:
     def pop(self):
         self.tb = self._stack.pop()
 
-    def insert_record(self, var, type, **args):
-        self.tb[var] = {'type': type} | args
+    def insert_record(self, var, **args):
+        self.tb[var] = args
 
     def q_dim(self, var):
         try:
@@ -28,6 +28,15 @@ class SymbolTable:
 
     def q_dim_bnd(self, var):
         return self.tb[var]['bound']
+
+    def q_value(self, var):
+        try:
+            return self.tb[var]['value']
+        except:
+            return None
+
+    def get_vars(self):
+        return set(self.tb)
 
     def print(self):
         for var in self.tb:

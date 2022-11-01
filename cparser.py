@@ -7,6 +7,7 @@ from parser import parse
 from utils import compute_N, check_conditions_consistency, z3_deep_simplify
 from closed_form import Closed_form
 from recurrence import Recurrence
+from symbol_table import SymbolTable
 
 # old_piecewise_eval_simplify = sp.Piecewise._eval_simplify
 # def new_piecewise_eval_simplify(self, **kwargs):
@@ -17,7 +18,8 @@ from recurrence import Recurrence
 
 class Vectorizer:
     def __init__(self):
-        self.symbol_table = {}
+        # self.symbol_table = {}
+        self.symbol_table = SymbolTable()
         self.loop_stack = []
 
     def visit(self, node):
@@ -28,14 +30,14 @@ class Vectorizer:
         for ext in node.ext:
             res = self.visit(ext)
             if isinstance(ext, Decl):
-                self.symbol_table[res[0]] = res[1]
+                self.symbol_table.insert_record(res[0], res[1])
         return node
 
 
     def visit_Decl(self, node):
         t = self.visit(node.type)
         init = self.visit(node.init)
-        return node.name, {'type': t, 'init': init}
+        return node.name, {'type': t, 'value': init}
         # self.symbol_table[node.name] = {'type': t, 'init': init}
 
     def visit_ArrayDecl(self, node):
@@ -63,11 +65,9 @@ class Vectorizer:
         return t, args
 
     def visit_FuncDef(self, node):
-        old_symbol_table = deepcopy(self.symbol_table)
         func_name = node.decl.name
         t, args = self.visit_FuncDecl(node.decl.type)
         self.visit(node.body)
-        self.symbol_table = old_symbol_table
 
     def visit_Compound(self, node):
         res = []
@@ -76,12 +76,14 @@ class Vectorizer:
             block_item = node.block_items[i]
             b = self.visit(block_item)
             if isinstance(block_item, Decl):
-                self.symbol_table[b[0]] = b[1]
+                self.symbol_table.insert_record(b[0], b[1])
+                # self.symbol_table[b[0]] = b[1]
                 lhs = sp.Symbol(b[0], integer=True)
                 rhs = b[1]['init']
                 res.append((lhs, rhs))
             elif isinstance(block_item, Assignment) and isinstance(b[1], int):
-                self.symbol_table[str(b[0])] = {'init': b[1]}
+                self.symbol_table.insert_record(str(b[0]), value=b[1])
+                # self.symbol_table[str(b[0])] = {'init': b[1]}
                 res.append(b)
             else:
                 res.append(b)
@@ -158,7 +160,8 @@ class Vectorizer:
         old_table = self.symbol_table.copy()
         # self.symbol_table = {}
         for var_info in init:
-            self.symbol_table[var_info[0]] = var_info[1]
+            self.symbol_table.insert_record(var_info[0], var_info[1])
+            # self.symbol_table[var_info[0]] = var_info[1]
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
@@ -171,7 +174,8 @@ class Vectorizer:
             rec.print()
             scalar_cf, array_cf = rec.solve_array()
             scalar_cf.remove_vars(array_cf.bounded_vars)
-            scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
+            scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
+            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
             # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
             scalar_cf.pp_print()
             num_iter = compute_N(cond, scalar_cf)
@@ -180,17 +184,17 @@ class Vectorizer:
             array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
             considered = set()
             # if 'i' in set(self.symbol_table) - set(old_table):
-            # if len(self.loop_stack) == 2:
-            #     array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
-            #     for closed_forms in array_cf.closed_forms:
-            #         not_considered = set(closed_forms) - considered
-            #         for var in not_considered:
-            #             considered.add(var)
-            #             for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
-            #                 array_cf.add_constraint(bnd_var < bnd)
-            #                 array_cf.add_constraint(bnd_var >= 0)
-            array_cf.simplify()
-            scalar_cf.simplify()
+            if len(self.loop_stack) == 2:
+                array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
+                for closed_forms in array_cf.closed_forms:
+                    not_considered = set(closed_forms) - considered
+                    for var in not_considered:
+                        considered.add(var)
+                        for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
+                            array_cf.add_constraint(bnd_var < bnd)
+                            array_cf.add_constraint(bnd_var >= 0)
+            # array_cf.simplify()
+            # scalar_cf.simplify()
             # res = scalar_cf, array_cf
             array_cf.pp_print()
             self.symbol_table = old_table

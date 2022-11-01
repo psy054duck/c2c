@@ -4,3 +4,4 @@ parser.out
 test.py
 tsvc/a.out
 *.out
+tsvc/*.out
