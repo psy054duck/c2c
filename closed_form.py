@@ -147,7 +147,7 @@ class Closed_form:
                         return {var: closed_form[var].subs(values) for var in closed_form}
         raise Exception('fail')
 
-    def to_c(self, dim_info):
+    def to_c(self, symbol_table):
         self._reorder_conditions()
         # self.pp_print()
         if self.is_splitable() and self.bounded_vars is not None:
@@ -155,7 +155,7 @@ class Closed_form:
         elif self.bounded_vars is None:
             res = self.to_c_scalar()
         else:
-            res = self.to_c_general(dim_info)
+            res = self.to_c_general(symbol_table)
         return res
     
     def to_c_scalar(self):
@@ -225,9 +225,9 @@ class Closed_form:
             stmt = c_ast.Assignment('=', expr2c(var), expr2c(closed[var]))
             # stmt_list.append(assignment)
             # stmt = c_ast.Compound(stmt_list)
-            for t, bnd in reversed(list(zip(var.args, symbol_table[str(var.func)]['type'][1]))):
+            for t, bnd in reversed(list(zip(var.args, symbol_table.q_dim_bnd(str(var.func))))):
                 stmt = c_ast.Compound([stmt])
-                decl = c_ast.Decl(str(t), None, None, None, None, c_ast.TypeDecl(str(t), [], None, c_ast.IdentifierType(['int'])), c_ast.Constant('int', str(0)), None)
+                decl = c_ast.Decl(str(t), None, None, None, None, c_ast.TypeDecl(str(t), [], None, c_ast.IdentifierType(['int'])), c_ast.Constant('int', '0'), None)
                 init = c_ast.DeclList([decl])
                 cond = c_ast.BinaryOp('<', c_ast.ID(str(t)), c_ast.Constant('int', str(bnd)))
                 nex = c_ast.UnaryOp('p++', c_ast.ID(str(t)))

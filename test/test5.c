@@ -4,10 +4,6 @@
 #define LEN2 N
 #define N 320000
 
-int dummy(float cc[LEN2][LEN2]){
-	// --  called in each loop to make all computations appear required
-	return 0;
-}
 int test5() {
     float a[N], b[N], c[N], d[N], cc[N][N], bb[N][N];
     clock_t start = clock();

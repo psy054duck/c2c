@@ -27,6 +27,7 @@ class SymbolTable:
         return self.tb[var]['type']
 
     def q_dim_bnd(self, var):
+        print(var)
         return self.tb[var]['bound']
 
     def q_value(self, var):

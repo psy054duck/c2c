@@ -37,7 +37,7 @@ class Vectorizer:
     def visit_Decl(self, node):
         t = self.visit(node.type)
         init = self.visit(node.init)
-        return node.name, {'type': t, 'value': init}
+        return node.name, {'type': t[0], 'bound': t[1], 'value': init}
         # self.symbol_table[node.name] = {'type': t, 'init': init}
 
     def visit_ArrayDecl(self, node):
@@ -76,10 +76,10 @@ class Vectorizer:
             block_item = node.block_items[i]
             b = self.visit(block_item)
             if isinstance(block_item, Decl):
-                self.symbol_table.insert_record(b[0], b[1])
+                self.symbol_table.insert_record(b[0], **b[1])
                 # self.symbol_table[b[0]] = b[1]
                 lhs = sp.Symbol(b[0], integer=True)
-                rhs = b[1]['init']
+                rhs = b[1]['value']
                 res.append((lhs, rhs))
             elif isinstance(block_item, Assignment) and isinstance(b[1], int):
                 self.symbol_table.insert_record(str(b[0]), value=b[1])
@@ -156,61 +156,63 @@ class Vectorizer:
     def visit_For(self, node):
         self.loop_stack.append(1)
         init = self.visit(node.init)
-        old_table = {}
-        old_table = self.symbol_table.copy()
+        old_vars = self.symbol_table.get_vars()
+        self.symbol_table.push()
         # self.symbol_table = {}
         for var_info in init:
-            self.symbol_table.insert_record(var_info[0], var_info[1])
+            self.symbol_table.insert_record(var_info[0], **var_info[1])
             # self.symbol_table[var_info[0]] = var_info[1]
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
-        try:
-            filename = 'rec.txt'
-            considered = set()
-            rec = for2rec(init, nex, stmt, filename=filename)
-            if rec is None:
-                rec = parse(filename)
-            rec.print()
-            scalar_cf, array_cf = rec.solve_array()
-            scalar_cf.remove_vars(array_cf.bounded_vars)
-            scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
-            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
-            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
-            scalar_cf.pp_print()
-            num_iter = compute_N(cond, scalar_cf)
-            scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
-            # array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
-            array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
-            considered = set()
-            # if 'i' in set(self.symbol_table) - set(old_table):
-            if len(self.loop_stack) == 2:
-                array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
-                for closed_forms in array_cf.closed_forms:
-                    not_considered = set(closed_forms) - considered
-                    for var in not_considered:
-                        considered.add(var)
-                        for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1]):
-                            array_cf.add_constraint(bnd_var < bnd)
-                            array_cf.add_constraint(bnd_var >= 0)
-            # array_cf.simplify()
-            # scalar_cf.simplify()
-            # res = scalar_cf, array_cf
-            array_cf.pp_print()
-            self.symbol_table = old_table
-            # res = array_cf.to_c() + scalar_cf.to_c()
-            res = scalar_cf, array_cf
-        except:
-            # dim_info = lambda cf: {bnd_var: bnd for bnd_var, bnd in zip(cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1])}
-            for st in stmt:
-                if isinstance(st, tuple):
-                    pass
+        # try:
+        filename = 'rec.txt'
+        considered = set()
+        rec = for2rec(init, nex, stmt, filename=filename)
+        if rec is None:
+            rec = parse(filename)
+        rec.print()
+        scalar_cf, array_cf = rec.solve_array()
+        array_cf.pp_print()
+        scalar_cf.remove_vars(array_cf.bounded_vars)
+        scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
+        # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
+        # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
+        scalar_cf.pp_print()
+        num_iter = compute_N(cond, scalar_cf)
+        scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
+        # array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
+        array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
+        considered = set()
+        # if 'i' in set(self.symbol_table) - set(old_table):
+        if len(self.loop_stack) == 2:
+            array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() - old_vars if self.symbol_table.q_value(var) is not None})
+            for closed_forms in array_cf.closed_forms:
+                not_considered = set(closed_forms) - considered
+                for var in not_considered:
+                    considered.add(var)
+                    for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
+                        array_cf.add_constraint(bnd_var < bnd)
+                        array_cf.add_constraint(bnd_var >= 0)
+        array_cf.simplify()
+        scalar_cf.simplify()
+        # res = scalar_cf, array_cf
+        array_cf.pp_print()
+        # self.symbol_table = old_table
+        self.symbol_table.pop()
+        # res = array_cf.to_c() + scalar_cf.to_c()
+        res = scalar_cf, array_cf
+        # except:
+        #     # dim_info = lambda cf: {bnd_var: bnd for bnd_var, bnd in zip(cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1])}
+        #     for st in stmt:
+        #         if isinstance(st, tuple):
+        #             pass
 
-            new_blocks = sum([cf[0].to_c({}) + cf[1].to_c(self.symbol_table) for cf in stmt if isinstance(cf, tuple)], []) + [s for s in stmt if not isinstance(s, tuple)]
-            node.stmt = Compound(new_blocks)
-            res = [node]
-            # gen = c_generator.CGenerator()
-            # print(gen.visit(cmp))
+        #     new_blocks = sum([cf[0].to_c({}) + cf[1].to_c(self.symbol_table) for cf in stmt if isinstance(cf, tuple)], []) + [s for s in stmt if not isinstance(s, tuple)]
+        #     node.stmt = Compound(new_blocks)
+        #     res = [node]
+        #     # gen = c_generator.CGenerator()
+        #     # print(gen.visit(cmp))
         self.loop_stack.pop()
         return res
     
@@ -277,7 +279,7 @@ def for2rec(init, nex, body, filename=None):
         pass
     else:
         with open(filename, 'w') as fp:
-            s = ''.join('%s = %s;\n' % (var, info['init']) for var, info in (init))
+            s = ''.join('%s = %s;\n' % (var, info['value']) for var, info in (init))
             s += 'if (%s) {\n' % conds[0]
             s += '%s\n' % _transform_stmt(stmts[0])
             s += '} '
