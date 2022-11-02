@@ -165,54 +165,63 @@ class Vectorizer:
         cond = self.visit(node.cond)
         nex = self.visit(node.next)
         stmt = self.visit(node.stmt)
-        # try:
-        filename = 'rec.txt'
-        considered = set()
-        rec = for2rec(init, nex, stmt, filename=filename)
-        if rec is None:
-            rec = parse(filename)
-        rec.print()
-        scalar_cf, array_cf = rec.solve_array()
-        array_cf.pp_print()
-        scalar_cf.remove_vars(array_cf.bounded_vars)
-        scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
-        # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
-        # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
-        scalar_cf.pp_print()
-        num_iter = compute_N(cond, scalar_cf)
-        scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
-        # array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
-        array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
-        considered = set()
-        # if 'i' in set(self.symbol_table) - set(old_table):
-        if len(self.loop_stack) == 2:
+        try:
+            filename = 'rec.txt'
+            considered = set()
+            rec = for2rec(init, nex, stmt, filename=filename)
+            if rec is None:
+                rec = parse(filename)
+            rec.print()
+            scalar_cf, array_cf = rec.solve_array()
+            array_cf.pp_print()
+            scalar_cf.remove_vars(array_cf.bounded_vars)
+            scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
+            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
+            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
+            scalar_cf.simplify()
+            # scalar_cf.pp_print()
+            num_iter = compute_N(cond, scalar_cf)
+            scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
+            # array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
+            array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
+            considered = set()
+            # if len(self.loop_stack) == 2:
             array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() - old_vars if self.symbol_table.q_value(var) is not None})
-            for closed_forms in array_cf.closed_forms:
-                not_considered = set(closed_forms) - considered
-                for var in not_considered:
-                    considered.add(var)
-                    for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
-                        array_cf.add_constraint(bnd_var < bnd)
-                        array_cf.add_constraint(bnd_var >= 0)
-        array_cf.simplify()
-        scalar_cf.simplify()
-        # res = scalar_cf, array_cf
-        array_cf.pp_print()
-        # self.symbol_table = old_table
-        self.symbol_table.pop()
-        # res = array_cf.to_c() + scalar_cf.to_c()
-        res = scalar_cf, array_cf
-        # except:
-        #     # dim_info = lambda cf: {bnd_var: bnd for bnd_var, bnd in zip(cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1])}
-        #     for st in stmt:
-        #         if isinstance(st, tuple):
-        #             pass
-
-        #     new_blocks = sum([cf[0].to_c({}) + cf[1].to_c(self.symbol_table) for cf in stmt if isinstance(cf, tuple)], []) + [s for s in stmt if not isinstance(s, tuple)]
-        #     node.stmt = Compound(new_blocks)
-        #     res = [node]
-        #     # gen = c_generator.CGenerator()
-        #     # print(gen.visit(cmp))
+            #     for closed_forms in array_cf.closed_forms:
+            #         not_considered = set(closed_forms) - considered
+            #         for var in not_considered:
+            #             considered.add(var)
+            #             for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
+            #                 array_cf.add_constraint(bnd_var < bnd)
+            #                 array_cf.add_constraint(bnd_var >= 0)
+            array_cf.simplify()
+            # scalar_cf.simplify()
+            # res = scalar_cf, array_cf
+            # array_cf.pp_print()
+            # self.symbol_table = old_table
+            self.symbol_table.pop()
+            # res = array_cf.to_c() + scalar_cf.to_c()
+            res = scalar_cf, array_cf
+        except:
+            # dim_info = lambda cf: {bnd_var: bnd for bnd_var, bnd in zip(cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1])}
+            for i, st in enumerate(stmt):
+                if isinstance(st, tuple):
+                    scalar_cf, array_cf = st
+                    array_cf.pp_print()
+                    array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() - old_vars if self.symbol_table.q_value(var) is not None})
+                    for closed_forms in array_cf.closed_forms:
+                        not_considered = set(closed_forms) - considered
+                        for var in not_considered:
+                            considered.add(var)
+                            for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
+                                array_cf.add_constraint(bnd_var < bnd)
+                                array_cf.add_constraint(bnd_var >= 0)
+                    stmt[i] = (scalar_cf, array_cf)
+            new_blocks = sum([cf[0].to_c({}) + cf[1].to_c(self.symbol_table) for cf in stmt if isinstance(cf, tuple)], []) + [s for s in stmt if not isinstance(s, tuple)]
+            node.stmt = Compound(new_blocks)
+            res = [node]
+            # gen = c_generator.CGenerator()
+            # print(gen.visit(cmp))
         self.loop_stack.pop()
         return res
     
