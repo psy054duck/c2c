@@ -74,7 +74,7 @@ class Recurrence:
                 acc2 = 0 if self.acc_transitions is None else self.acc_transitions[j]
                 if (self.acc_transitions is None and trans2 in new_transitions) or (trans2 in new_transitions and self.acc_transitions is not None and acc2 in new_acc_transitions): continue
                 if trans1 == trans2 and acc1 == acc2:
-                    new_condition = sp.Or(cond1, cond2)
+                    new_condition = sp.Or(new_condition, cond2)
             new_conditions.append(sp.simplify(new_condition))
             new_transitions.append(trans1)
             if self.acc_transitions is not None:
@@ -207,6 +207,7 @@ class Recurrence:
         solver.add(*self.constraints)
         solver.add(*[to_z3(var) == to_z3(self.inits[var]) for var in self.inits])
         tot_closed_form = []
+
         while solver.check() == z3.sat:
             m = solver.model()
             cur_initals = {var: m.eval(z3.Int(str(var)), model_completion=True).as_long() for var in self.variables}

@@ -16,6 +16,9 @@ class SymbolTable:
     def insert_record(self, var, **args):
         self.tb[var] = args
 
+    def add_attribute(self, var, **args):
+        self.tb[var] |= args
+
     def q_dim(self, var):
         try:
             res = self.tb[var]['dim']
@@ -27,7 +30,6 @@ class SymbolTable:
         return self.tb[var]['type']
 
     def q_dim_bnd(self, var):
-        print(var)
         return self.tb[var]['bound']
 
     def q_value(self, var):

@@ -15,6 +15,12 @@ class Closed_form:
         self.sum_end = sum_end
         # self._simplify_conditions()
 
+    def keep_live_vars(self, live_vars):
+        for i in range(len(self.closed_forms)):
+            closed = self.closed_forms[i]
+            closed = {var: closed[var] for var in closed if var.name in live_vars}
+            self.closed_forms[i] = closed
+
     def remove_vars(self, vars):
         for i in range(len(self.closed_forms)):
             closed = self.closed_forms[i]
@@ -148,6 +154,7 @@ class Closed_form:
         raise Exception('fail')
 
     def to_c(self, symbol_table):
+        self.keep_live_vars(symbol_table.get_vars())
         self._reorder_conditions()
         # self.pp_print()
         if self.is_splitable() and self.bounded_vars is not None:

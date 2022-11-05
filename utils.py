@@ -210,8 +210,12 @@ def expr2c(expr: sp.Expr):
         for i in range(2, len(expr.args)):
             res = ast.BinaryOp('+', res, expr2c(expr.args[i]))
     elif isinstance(expr, sp.Mul):
-        assert(len(expr.args) == 2)
+        # print(expr)
+        # print(expr.args)
+        # assert(len(expr.args) == 2)
         res = ast.BinaryOp('*', expr2c(expr.args[0]), expr2c(expr.args[1]))
+        for i in range(2, len(expr.args)):
+            res = ast.BinaryOp('*', res, expr2c(expr.args[i]))
     elif isinstance(expr, sp.Integer) or isinstance(expr, int):
         res = ast.Constant('int', str(expr))
     elif expr.is_Function:
