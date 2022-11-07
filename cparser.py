@@ -29,9 +29,15 @@ class Vectorizer:
         for ext in node.ext:
             res = self.visit(ext)
             if isinstance(ext, Decl):
-                self.symbol_table.insert_record(res[0], res[1])
+                self.symbol_table.insert_record(res[0], **res[1])
         return node
 
+
+    def visit_Cast(self, node):
+        pass
+
+    def visit_Typename(self, node):
+        pass
 
     def visit_Decl(self, node):
         t = self.visit(node.type)
@@ -52,9 +58,10 @@ class Vectorizer:
 
     def visit_Constant(self, node):
         if node.type == 'float' or node.type == 'double':
-            return float(node.value)
+            return sp.Float(node.value)
+            # return float(node.value)
         elif node.type == 'int':
-            return int(node.value)
+            return sp.Integer(node.value)
         else:
             raise exception('Type "%s" is not implemented' % node.type)
 
@@ -64,11 +71,14 @@ class Vectorizer:
         return t, args
 
     def visit_FuncDef(self, node):
-        func_name = node.decl.name
-        self.symbol_table.push()
-        t, args = self.visit_FuncDecl(node.decl.type)
-        self.visit(node.body)
-        self.symbol_table.pop()
+        try:
+            func_name = node.decl.name
+            self.symbol_table.push()
+            t, args = self.visit_FuncDecl(node.decl.type)
+            self.visit(node.body)
+            self.symbol_table.pop()
+        except:
+            pass
 
     def visit_Compound(self, node):
         res = []
@@ -137,6 +147,12 @@ class Vectorizer:
             return left / right
         elif node.op == '<':
             return left < right
+        elif node.op == '>':
+            return left > right
+        elif node.op == '<=':
+            return left <= right
+        elif node.op == '>=':
+            return left >= right
         else:
             raise Exception('Operation "%s" is not implemented' % node.op)
 
@@ -200,10 +216,10 @@ class Vectorizer:
             #             for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
             #                 array_cf.add_constraint(bnd_var < bnd)
             #                 array_cf.add_constraint(bnd_var >= 0)
-            # array_cf.simplify()
+            array_cf.simplify()
             # scalar_cf.simplify()
             # res = scalar_cf, array_cf
-            # array_cf.pp_print()
+            array_cf.pp_print()
             # self.symbol_table = old_table
             # res = array_cf.to_c() + scalar_cf.to_c()
             res = scalar_cf, array_cf
@@ -226,8 +242,9 @@ class Vectorizer:
                     array_cf.simplify()
                     array_cf.pp_print()
                     stmt[i] = (scalar_cf, array_cf)
-            new_blocks = sum([cf[0].to_c(self.symbol_table) + cf[1].to_c(self.symbol_table) for cf in stmt if self._is_cf_tuple(cf)], []) + [s for s in stmt if not self._is_cf_tuple(s) and not self._is_simple_assignment(s)]
-            node.stmt = Compound(new_blocks)
+            new_blocks = sum([cf[0].to_c(self.symbol_table) + cf[1].to_c(self.symbol_table) for cf in stmt if self._is_cf_tuple(cf)], []) + sum([s if isinstance(s, list) else [s] for s in stmt if not self._is_cf_tuple(s) and not self._is_simple_assignment(s)], [])
+            if any(self._is_cf_tuple(st) for st in stmt):
+                node.stmt = Compound(new_blocks)
             res = [node]
             # gen = c_generator.CGenerator()
             # print(gen.visit(cmp))
@@ -377,12 +394,13 @@ def flat_body_compound(body):
 
 
 if __name__ == '__main__':
-    test_file = 'test/test6.c'
+    # test_file = 'test/test7.c'
+    test_file = './tsvc_original.c'
     try:
         c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
     # c_ast = parse_file('test.c', use_cpp=True)
     except:
-        c_ast = parse_file(test_file, use_cpp=True, cpp_args='-I./fake_libc_include')
+        c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang', cpp_args=['-E', '-I./fake_libc_include'])
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
