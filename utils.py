@@ -317,13 +317,62 @@ def my_sp_simplify(expr, assumptions):
             pass
     return sp.simplify(res)
 
+def collapse_piecewise(expr):
+    sim = z3.Tactic('ctx-solver-simplify')
+    res = expr
+    merged = {}
+    if isinstance(expr, sp.Piecewise):
+        exprs = [e for e, _ in expr.args]
+        conditions = [to_z3(expr.args[0][1])]
+        for _, cond in expr.args[1:]:
+            conditions.append(z3.And(to_z3(cond), z3.Not(conditions[-1])))
+        for i in range(len(conditions)):
+            absorbed = reduce(set.union, (merged[idx] for idx in merged), set())
+            if i in absorbed: continue
+            merged[i] = set()
+            for j in range(len(conditions)):
+                absorbed = reduce(set.union, (merged[idx] for idx in merged))
+                if i == j or j in absorbed: continue
+                s = z3.Solver()
+                s.add(conditions[j])
+                s.push()
+                s.add(z3.Not(to_z3(exprs[i]) == to_z3(exprs[j])))
+                check_res = s.check()
+                print(s.model())
+                s.pop()
+                if check_res == z3.unsat:
+                    merged[i].add(j)
+        new_exprs = []
+        new_conditions = []
+        absorbed = reduce(set.union, (merged[idx] for idx in merged))
+        for i in merged:
+            cur_condition = to_sympy(z3_deep_simplify(z3.And(z3.BoolVal(True), *sim(z3.Or(conditions[i], *[conditions[j] for j in merged[i]]))[0])))
+            # cur_condition = to_sympy(z3_deep_simplify(z3.And(z3.BoolVal(True), *sim(to_z3(sp.Or(conditions[i], *[conditions[j] for j in merged[i]])))[0])))
+            if i not in absorbed:
+                new_exprs.append(exprs[i])
+                new_conditions.append(cur_condition)
+            else:
+                conditions[i] = cur_condition
+        res = sp.Piecewise(*[(e, c) for e, c in zip(new_exprs, new_conditions)])
+    return res
+        # self.closed_forms = new_closed_forms
+        # self.conditions = new_conditions
+
 
 if __name__ == '__main__':
     a = sp.Function('a')
-    i = sp.Symbol('i', integer=True)
-    e = 2*a(i+1) + 1
-    from pycparser import c_generator
-    generator = c_generator.CGenerator()
-    print(generator.visit(expr2c(e)))
+    bb = sp.Function('bb')
+    cc = sp.Function('cc')
+    d = sp.Function('d')
+    _t0 = sp.Symbol('_t0', integer=True)
+    _t1 = sp.Symbol('_t1', integer=True)
+    e = sp.Piecewise((a(0) + bb(0, _t1)*d(0) + cc(0, _t1), sp.Eq(_t0, 0)), (a(_t0) + bb(_t0, _t1)*d(_t0), True))
+    print(collapse_piecewise(e))
+    # a = sp.Function('a')
+    # i = sp.Symbol('i', integer=True)
+    # e = 2*a(i+1) + 1
+    # from pycparser import c_generator
+    # generator = c_generator.CGenerator()
+    # print(generator.visit(expr2c(e)))
 
     # print(get_app_by_var(a, e))

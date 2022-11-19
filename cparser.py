@@ -34,7 +34,7 @@ class Vectorizer:
 
 
     def visit_Cast(self, node):
-        pass
+        return self.visit(node.expr)
 
     def visit_Typename(self, node):
         pass
@@ -57,11 +57,11 @@ class Vectorizer:
         return (node.names, [])
 
     def visit_Constant(self, node):
-        if node.type == 'float' or node.type == 'double':
+        if node.type == 'float' or node.type == 'double' and float(node.value) != float(node.value)//1:
             return sp.Float(node.value)
             # return float(node.value)
-        elif node.type == 'int':
-            return sp.Integer(node.value)
+        elif node.type == 'int' or float(node.value) == float(node.value)//1:
+            return sp.Integer(float(node.value)//1)
         else:
             raise exception('Type "%s" is not implemented' % node.type)
 
@@ -77,7 +77,7 @@ class Vectorizer:
             t, args = self.visit_FuncDecl(node.decl.type)
             self.visit(node.body)
             self.symbol_table.pop()
-        except:
+        except :
             pass
 
     def visit_Compound(self, node):
@@ -92,7 +92,7 @@ class Vectorizer:
                 lhs = sp.Symbol(b[0], integer=True)
                 rhs = b[1]['value']
                 res.append((lhs, rhs))
-            elif isinstance(block_item, Assignment) and isinstance(b[1], int):
+            elif isinstance(block_item, Assignment) and is_const(b[1]):
                 self.symbol_table.insert_record(str(b[0]), value=b[1])
                 # self.symbol_table[str(b[0])] = {'init': b[1]}
                 res.append(b)
@@ -159,8 +159,12 @@ class Vectorizer:
 
     def visit_UnaryOp(self, node):
         expr = self.visit(node.expr)
-        if node.op == 'p++' or node.op == '++':
+        if node.op in ['p++', '++']:
             return (expr, expr + 1)
+        if node.op in ['p--', '--']:
+            return (expr, expr - 1)
+        if node.op == '-':
+            return (expr, -expr)
         else:
             raise Exception('Operation "%s" is not implemented' % node.op)
 
@@ -169,6 +173,9 @@ class Vectorizer:
         for decl in node.decls:
             res.append(self.visit(decl))
         return res
+
+    def visit_EmptyStatement(self, node):
+        pass
 
     def visit_For(self, node):
         init = self.visit(node.init)
@@ -226,6 +233,7 @@ class Vectorizer:
         except:
             # dim_info = lambda cf: {bnd_var: bnd for bnd_var, bnd in zip(cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1])}
             considered = set()
+            self.symbol_table.print()
             for i, st in enumerate(stmt):
                 if self._is_cf_tuple(st):
                     scalar_cf, array_cf = st
@@ -309,7 +317,10 @@ class Vectorizer:
         return isinstance(stmt, tuple) and len(stmt) == 2 and all(isinstance(cf, Closed_form) for cf in stmt)
 
     def _is_simple_assignment(self, st):
-        return isinstance(st, tuple) and isinstance(st[1], int)
+        return isinstance(st, tuple) and is_const(st[1])
+
+def is_const(expr):
+    return isinstance(expr, int) or isinstance(expr, float) or isinstance(expr, sp.Integer) or isinstance(expr, sp.Float)
 
 def for2rec(init, nex, body, live_vars, filename=None):
     if all(isinstance(b, tuple) for b in body) and all(all(isinstance(i, Closed_form) for i in b) for b in body):
@@ -387,20 +398,21 @@ def flat_body_compound(body):
             for j, cond2 in enumerate(t_conds + f_conds):
                 subs_pairs = res_stmt[i]
                 cur_cond.append(sp.And(cond1, cond2.subs(subs_pairs)))
-                cur_stmt.append(res_stmt[i] + [(var if isinstance(var, sp.Symbol) else var.subs(subs_pairs), s.subs(subs_pairs)) for var, s in stmt[j]])
+                cur_single_stmt = res_stmt[i] + [(var if isinstance(var, sp.Symbol) else var.func(*[arg.subs(subs_pairs) for arg in var.args]), s.subs(subs_pairs)) for var, s in stmt[j]]
+                cur_stmt.append([(var, expr) for x, (var, expr) in enumerate(cur_single_stmt) if var not in {v[0] for v in cur_single_stmt[x+1:]}])
         res_cond = cur_cond
         res_stmt = cur_stmt
     return res_cond, res_stmt
 
 
 if __name__ == '__main__':
-    # test_file = 'test/test7.c'
-    test_file = './tsvc_original.c'
-    try:
-        c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
-    # c_ast = parse_file('test.c', use_cpp=True)
-    except:
-        c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang', cpp_args=['-E', '-I./fake_libc_include'])
+    test_file = 'test/tsc2.c'
+    # test_file = './tsvc_original.c'
+    # try:
+    #     c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
+    # # c_ast = parse_file('test.c', use_cpp=True)
+    # except:
+    c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang', cpp_args=['-E', '-I./fake_libc_include'])
     vectorizer = Vectorizer()
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()

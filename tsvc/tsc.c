@@ -3380,6 +3380,12 @@ int s254p()
 
 // %2.5
 
+// c
+a[i] = a[i-1] + b[i]
+
+// closed-form
+a[i] = a[0] + sum(b[i], 0, N)
+
 int s255()
 {
 
@@ -3575,8 +3581,8 @@ int s257()
 	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
 		for (int i = 1; i < LEN2; i++) {
 			for (int j = 0; j < LEN2; j++) {
-				a[i] = aa[j][i] - a[i-1];
-				aa[j][i] = a[i] + bb[j][i];
+				a[i] = aa[j][i] - a[i-1];   // a(t0, n+1) = ite(t0 == i, aa(j(n), i, n) - a(i-1, n), a(t0, n))
+				aa[j][i] = a[i] + bb[j][i]; // aa(t0, t1, n+1) = ite(t0 == j(n) && t1 == i, aa(j(n), i, n) - a(i-1, n) + bb(j(n), i, 0))
 			}
 		}
 		dummy(a, b, c, d, e, aa, bb, cc, 0.);
@@ -3584,6 +3590,114 @@ int s257()
 	end_t = clock(); clock_dif = end_t - start_t;
 	clock_dif_sec = (double) (clock_dif/1000000.0);
 	printf("S257\t %.2f \t\t", clock_dif_sec);;
+	check(111);
+	return 0;
+}
+
+int s257p()
+{
+
+//	scalar and array expansion
+//	array expansion
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s257 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
+		// for (int i = 1; i < LEN2; i++) {
+		// 	for (int j = 0; j < LEN2; j++) {
+		// 		a[i] = aa[j][i] - a[i-1];
+		// 		aa[j][i] = aa[j][i] - a[i-1] + bb[j][i];
+		// 	}
+		// }
+		for (int i = 0; i < LEN2; i++) {
+			a[i] = aa[LEN2-1][i] - a[i-1];
+			for (int j = 1; j < LEN2; j++) {
+				aa[i][j] = aa[i][j] - a[j-1] + bb[i][j];
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S257p\t %.2f \t\t", clock_dif_sec);;
+	check(111);
+	return 0;
+}
+
+int s257pp()
+{
+
+//	scalar and array expansion
+//	array expansion
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s257 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
+		// for (int i = 1; i < LEN2; i++) {
+		// 	for (int j = 0; j < LEN2; j++) {
+		// 		a[i] = aa[j][i] - a[i-1];
+		// 		aa[j][i] = aa[j][i] - a[i-1] + bb[j][i];
+		// 	}
+		// }
+		for (int i = 1; i < LEN2; i++) {
+			a[i] = aa[LEN2-1][i] - a[i-1];
+			for (int j = 0; j < LEN2; j++) {
+				aa[j][i] = aa[j][i] - a[i-1] + bb[j][i];
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S257pp\t %.2f \t\t", clock_dif_sec);;
+	check(111);
+	return 0;
+}
+
+int s257ppp()
+{
+
+//	scalar and array expansion
+//	array expansion
+
+	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
+
+
+	init( "s257 ");
+	start_t = clock();
+
+	for (int nl = 0; nl < 10*(ntimes/LEN2); nl++) {
+		// for (int i = 1; i < LEN2; i++) {
+		// 	for (int j = 0; j < LEN2; j++) {
+		// 		a[i] = aa[j][i] - a[i-1];
+		// 		aa[j][i] = aa[j][i] - a[i-1] + bb[j][i];
+		// 	}
+		// }
+		// for (int i = 1; i < LEN2; i++) {
+		// 	for (int j = 0; j < LEN2; j++) {
+		// 		a[i] = aa[LEN2-1][i] - a[i-1];
+		// 		aa[j][i] = a[i] + bb[j][i];
+		// 	}
+		// }
+		for (int i = 0; i < LEN2; i++) {
+			for (int j = 1; j < LEN2; j++) {
+				a[j] = aa[i][j] - a[j-1];
+				aa[i][j] = a[j] + bb[i][j];
+			}
+		}
+		dummy(a, b, c, d, e, aa, bb, cc, 0.);
+	}
+	end_t = clock(); clock_dif = end_t - start_t;
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S257ppp\t %.2f \t\t", clock_dif_sec);;
 	check(111);
 	return 0;
 }
@@ -6778,6 +6892,10 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
+	s257();
+	s257p();
+	s257pp();
+	s257ppp();
 	// s1112();
 	// s1112p();
 	// s256s();
@@ -6822,8 +6940,8 @@ int main(){
 	// s352p();
 	// s2710(s1);
 	// s2710p(s1);
-	s2102();
-	s2102p();
+	// s2102();
+	// s2102p();
 	// s2275();
 	// s2275p();
 	// s275();

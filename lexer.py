@@ -43,8 +43,8 @@ t_FALSE = r'False'
 t_ignore = ' \t'
 
 def t_NUMBER(t):
-    r'\d+'
-    t.value = int(t.value)
+    r'\-?\d+\.?'
+    t.value = int(t.value[:-1] if t.value[-1] == '.' else t.value)
     return t
 
 def t_VARIABLE(t):
