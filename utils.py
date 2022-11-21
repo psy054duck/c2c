@@ -28,7 +28,9 @@ def check_conditions_consistency(conditions):
 def z3_deep_simplify(expr):
     # print(expr)
     sim = z3.Tactic('ctx-solver-simplify')
-    cond_list = list(sim(expr)[0])
+    # sim = z3.Repeat(z3.Then('propagate-ineqs', 'ctx-solver-simplify'))
+    simplify_res = sim(expr)
+    cond_list = list(simplify_res[0])
     # print(cond_list)
     new_cond_list = []
     for cond in cond_list:

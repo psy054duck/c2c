@@ -423,4 +423,4 @@ if __name__ == '__main__':
     new_ast = vectorizer.visit(c_ast)
     generator = c_generator.CGenerator()
     res = generator.visit(new_ast)
-    print(res)
+    # print(res)

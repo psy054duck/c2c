@@ -131,6 +131,7 @@ class Recurrence:
             # for closed in arr_part_closed_form.closed_forms:
             #     print(closed)
             arr_part_closed_form.simplify()
+            arr_part_closed_form.pp_print()
             array_closed_form = self._form_array_closed_form(arr_part_closed_form, array_func, t_list, acc)
             array_closed_forms.append(array_closed_form)
 
@@ -168,12 +169,13 @@ class Recurrence:
             transitions = []
             new_conditions = []
             d = sp.Symbol('d_p', integer=True)
-            scalar_closed_form = {var: scalar_closed_form[var].subs(Recurrence.neg_ind_var, d) for var in
+            scalar_closed_form_p = {var: scalar_closed_form[var].subs(Recurrence.neg_ind_var, d) for var in
                                   scalar_closed_form}
             acc_transitions = []
             # e_transitions = []
             for cond, trans in zip(self.conditions, self.transitions):
-                t_trans = {var: get_app_by_var(var.func, trans[var]) for var in trans if self.arity.get(var, 0) >= 1}
+                # t_trans = {var: get_app_by_var(var.func, trans[var]) for var in trans if self.arity.get(var, 0) >= 1}
+                t_trans = {array_var: get_app_by_var(array_var.func, trans[array_var])}
                 t_trans = {var: t_trans[var] if t_trans[var] is not None else var for var in t_trans}
                 e_trans = {var: trans[var].coeff(t_trans[var]) for var in t_trans}
                 acc_terms = {var: trans[var] - e_trans[var] * t_trans[var] for var in t_trans}
@@ -181,23 +183,25 @@ class Recurrence:
                 # e_trans = {var: e_trans[var] if e_trans[var] != 0 else 3 for var in e_trans}
                 # acc_terms = {var: acc_terms[var].subs(scalar_closed_form) for var in acc_terms}
                 for app in t_trans:
-                    cond_arr = sp.And(*[sp.Eq(t, arg.subs(scalar_closed_form, simultaneous=True)) for t, arg in
+                    cond_arr = sp.And(*[sp.Eq(t, arg.subs(scalar_closed_form_p, simultaneous=True)) for t, arg in
                                         zip(t_list, app.args)])
-                    new_conditions.append(sp.simplify(sp.And(cond.subs(scalar_closed_form), cond_arr)))
+                    new_conditions.append(sp.simplify(sp.And(cond.subs(scalar_closed_form_p), cond_arr)))
                     # new_conditions.append(sp.And(cond.subs(scalar_closed_form), cond_arr))
-                    new_trans = {t: self._expr2involving_t(t, arg1, arg2).subs(scalar_closed_form, simultaneous=True)
+                    new_trans = {t: self._expr2involving_t(t, arg1, arg2).subs(scalar_closed_form_p, simultaneous=True)
                                  for arg1, arg2, t in zip(app.args, t_trans[app].args, t_list)}
                     # transitions.append(new_trans | {d: d + 1, acc: acc + acc_terms[app]})
                     transitions.append(new_trans | {d: d + 1} | {e: e_trans[app] * e})
                     # acc_transitions.append({acc: acc + acc_terms[app].subs(scalar_closed_form, simultaneous=True)})
-                    acc_transitions.append(
-                        acc_terms[app].subs(scalar_closed_form, simultaneous=True).subs(d, Recurrence.neg_ind_var))
+                    acc_transitions.append(acc_terms[app].subs(scalar_closed_form_p, simultaneous=True).subs(d, Recurrence.neg_ind_var))
                     # e_transitions.append(e_trans[app])
                     # transitions.append(new_trans | {d: d + 1})
             new_conditions.append(sp.simplify(sp.Not(sp.Or(*[cond for cond in new_conditions]))))
+            print(new_conditions)
 
             transitions.append({t: t for t in t_list} | {d: d + 1} | {e: e})
+            print(transitions)
             acc_transitions.append(0)
+            print(acc_transitions)
             # e_transitions.append(1)
             # transitions.append({t: t for t in t_list} | {d: d + 1})
             res.append((Recurrence({d: 0, acc: 0, e: 1} | self.inits, new_conditions, transitions,
@@ -324,16 +328,27 @@ class Recurrence:
                 conditions.append(sp.simplify(sp.And(cond, acc_k <= self.ind_var, self.ind_var < acc_k + len(seq) * k)))
                 if acc_transition is not None:
                     assert (len(seq) == 1)
+                    print(conditions[-1])
+                    print(k)
+                    print(seq)
                     for i in seq:
                         e = closed[sp.Symbol('_e', integer=True)]
                         if k is not sp.oo and k.is_constant():
                             # acc += sp.summation(acc_transition[i], (self.ind_var, acc_k, (acc_k + len(seq)*k - 1) if k is not sp.oo else self.sum_end - 1))
-                            acc = acc + sum(
-                                e.subs(self.ind_var, acc_k + j) * acc_transition[i].subs(self.ind_var, acc_k + j) for j
-                                in range(len(seq) * k))
+                            # acc = acc + sum(
+                            #     e.subs(self.ind_var, acc_k + j) * acc_transition[i].subs(self.ind_var, acc_k + j) for j
+                            #     in range(len(seq) * k))
+                            for j in range(len(seq)*k):
+                                acc = e.subs(self.ind_var, acc_k + j)*acc + acc_transition[i].subs(self.ind_var, acc_k + j)
                         else:
                             acc = acc + sp.summation(e * acc_transition[i], (
                             self.ind_var, acc_k, (acc_k + len(seq) * k - 1) if k is not sp.oo else self.sum_end - 1))
+
+                    print('e: %s' % e)
+                    print(self.ind_var)
+                    print('e.subs: %s' % e.subs(self.ind_var, acc_k))
+                    print(acc)
+                    print('#'*100)
                     res_closed_forms.append(closed | {sp.Symbol('_acc', integer=True): acc.doit()})
                 else:
                     res_closed_forms.append(closed)
