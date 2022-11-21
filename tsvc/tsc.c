@@ -1369,6 +1369,40 @@ int s121p()
 	return 0;
 }
 
+int s121pp()
+{
+  clock_t start_t;
+  clock_t end_t;
+  clock_t clock_dif;
+  double clock_dif_sec;
+  init("s121 ");
+  start_t = clock();
+  int j;
+  for (int nl = 0; nl < (3 * 50000); nl++)
+  {
+    j = 31999;
+    for (int _t0 = 0; _t0 < 31999; _t0++)
+    {
+      a[_t0] = a[1 + _t0] + b[_t0];
+    }
+
+    for (int _t0 = 31999; _t0 < 32000; _t0++)
+    {
+      a[_t0] = a[_t0];
+    }
+
+    dummy(a, b, c, d, e, aa, bb, cc, 0.);
+  }
+
+  end_t = clock();
+  clock_dif = end_t - start_t;
+  clock_dif_sec = (double) (clock_dif / 1000000.0);
+  printf("S121pp\t %.2f \t\t", clock_dif_sec);
+  ;
+  check(1);
+  return 0;
+}
+
 // %1.2
 
 int s122(int n1, int n3)
@@ -3381,10 +3415,8 @@ int s254p()
 // %2.5
 
 // c
-a[i] = a[i-1] + b[i]
 
 // closed-form
-a[i] = a[0] + sum(b[i], 0, N)
 
 int s255()
 {
@@ -6892,10 +6924,13 @@ int main(){
 	set(ip, &s1, &s2);
 	printf("Loop \t Time(Sec) \t Checksum \n");
 
-	s257();
-	s257p();
-	s257pp();
-	s257ppp();
+	s121();
+	s121p();
+	s121pp();
+	// s257();
+	// s257p();
+	// s257pp();
+	// s257ppp();
 	// s1112();
 	// s1112p();
 	// s256s();

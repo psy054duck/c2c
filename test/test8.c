@@ -17,28 +17,28 @@ int temp_int;
 __attribute__((aligned(16))) float a[LEN],b[LEN],c[LEN],d[LEN],e[LEN],
                                    aa[LEN2][LEN2],bb[LEN2][LEN2],cc[LEN2][LEN2],tt[LEN2][LEN2];
 
-int s1112()
+int s211()
 {
 
-//	linear dependence testing
-//	loop reversal
+//	statement reordering
+//	statement reordering allows vectorization
 
 	clock_t start_t, end_t, clock_dif; double clock_dif_sec;
-	
 
-	init("s112 ");
+
+	init( "s211 ");
 	start_t = clock();
 
-	for (int nl = 0; nl < ntimes*3; nl++) {
-		for (int i = LEN - 1; i >= 0; i--) {
-			a[i] = b[i] + (float) 1.;
+	for (int nl = 0; nl < ntimes; nl++) {
+		for (int i = 0; i < LEN; i++) {
+			a[i] = i;
+			b[i] = i;
 		}
 		dummy(a, b, c, d, e, aa, bb, cc, 0.);
 	}
 	end_t = clock(); clock_dif = end_t - start_t;
-	clock_dif_sec = (double) (clock_dif /1000000.0);
-	
-	printf("S1112\t %.2f \t\t ", clock_dif_sec);
-	check(1);
+	clock_dif_sec = (double) (clock_dif/1000000.0);
+	printf("S211\t %.2f \t\t", clock_dif_sec);;
+	check(12);
 	return 0;
 }

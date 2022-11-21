@@ -202,60 +202,65 @@ class Vectorizer:
             if rec is None:
                 rec = parse(filename)
             rec.print()
-            scalar_cf, array_cf = rec.solve_array()
-            scalar_cf.remove_vars(array_cf.bounded_vars)
-            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
-            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
-            # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
-            # scalar_cf.simplify()
-            # scalar_cf.pp_print()
+            scalar_cf, array_cfs = rec.solve_array()
+            final_array_cfs = []
+
+            scalar_cf.remove_vars(array_cfs[0].bounded_vars)
             num_iter = compute_N(cond, scalar_cf)
             scalar_cf = scalar_cf.subs({scalar_cf.ind_var: num_iter})
-            # array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
-            array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
-            # considered = set()
-            # if len(self.loop_stack) == 2:
-            # array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() - old_vars if self.symbol_table.q_value(var) is not None})
-            #     for closed_forms in array_cf.closed_forms:
-            #         not_considered = set(closed_forms) - considered
-            #         for var in not_considered:
-            #             considered.add(var)
-            #             for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
-            #                 array_cf.add_constraint(bnd_var < bnd)
-            #                 array_cf.add_constraint(bnd_var >= 0)
-            array_cf.simplify()
-            # scalar_cf.simplify()
-            # res = scalar_cf, array_cf
-            array_cf.pp_print()
-            # self.symbol_table = old_table
-            # res = array_cf.to_c() + scalar_cf.to_c()
-            res = scalar_cf, array_cf
+            for array_cf in array_cfs:
+                # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
+                # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in self.symbol_table if self.symbol_table[var]['init'] is not None})
+                # scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var] for var in self.symbol_table if self.symbol_table[var] is not None})
+                # scalar_cf.simplify()
+                # scalar_cf.pp_print()
+                # array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table[var]['init'] for var in set(self.symbol_table) - set(old_table) if self.symbol_table[var]['init'] is not None})
+                array_cf = array_cf.subs({array_cf.ind_var: num_iter, array_cf.sum_end: num_iter})
+                # considered = set()
+                # if len(self.loop_stack) == 2:
+                # array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() - old_vars if self.symbol_table.q_value(var) is not None})
+                #     for closed_forms in array_cf.closed_forms:
+                #         not_considered = set(closed_forms) - considered
+                #         for var in not_considered:
+                #             considered.add(var)
+                #             for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
+                #                 array_cf.add_constraint(bnd_var < bnd)
+                #                 array_cf.add_constraint(bnd_var >= 0)
+                array_cf.simplify()
+                # scalar_cf.simplify()
+                # res = scalar_cf, array_cf
+                array_cf.pp_print()
+                # self.symbol_table = old_table
+                # res = array_cf.to_c() + scalar_cf.to_c()
+                final_array_cfs.append(array_cf)
+            res = scalar_cf, final_array_cfs 
         except:
-            # dim_info = lambda cf: {bnd_var: bnd for bnd_var, bnd in zip(cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1])}
+        # dim_info = lambda cf: {bnd_var: bnd for bnd_var, bnd in zip(cf.bounded_vars, self.symbol_table[str(var.func)]['type'][1])}
             considered = set()
-            self.symbol_table.print()
             for i, st in enumerate(stmt):
                 if self._is_cf_tuple(st):
-                    scalar_cf, array_cf = st
+                    scalar_cf, array_cfs = st
                     scalar_cf = scalar_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
-                    array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
-                    for closed_forms in array_cf.closed_forms:
-                        not_considered = set(closed_forms) - considered
-                        for var in not_considered:
-                            considered.add(var)
-                            for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
-                                array_cf.add_constraint(bnd_var < bnd)
-                                array_cf.add_constraint(bnd_var >= 0)
-                    scalar_cf.simplify()
-                    array_cf.simplify()
-                    array_cf.pp_print()
-                    stmt[i] = (scalar_cf, array_cf)
-            new_blocks = sum([cf[0].to_c(self.symbol_table) + cf[1].to_c(self.symbol_table) for cf in stmt if self._is_cf_tuple(cf)], []) + sum([s if isinstance(s, list) else [s] for s in stmt if not self._is_cf_tuple(s) and not self._is_simple_assignment(s)], [])
+                    new_array_cfs = []
+                    for array_cf in array_cfs:
+                        array_cf = array_cf.subs({sp.Symbol(var, integer=True): self.symbol_table.q_value(var) for var in self.symbol_table.get_vars() if self.symbol_table.q_value(var) is not None})
+                        for closed_forms in array_cf.closed_forms:
+                            not_considered = set(closed_forms) - considered
+                            for var in not_considered:
+                                considered.add(var)
+                                for bnd_var, bnd in zip(array_cf.bounded_vars, self.symbol_table.q_dim_bnd(str(var.func))):
+                                    array_cf.add_constraint(bnd_var < bnd)
+                                    array_cf.add_constraint(bnd_var >= 0)
+                        scalar_cf.simplify()
+                        array_cf.simplify()
+                        array_cf.pp_print()
+                        new_array_cfs.append(array_cf)
+                    stmt[i] = (scalar_cf, new_array_cfs)
+            new_blocks = sum([cf[0].to_c(self.symbol_table) + sum([cf_i.to_c(self.symbol_table) for cf_i in cf[1]], []) for cf in stmt if self._is_cf_tuple(cf)], []) + sum([s if isinstance(s, list) else [s] for s in stmt if not self._is_cf_tuple(s) and not self._is_simple_assignment(s)], [])
             if any(self._is_cf_tuple(st) for st in stmt):
                 node.stmt = Compound(new_blocks)
             res = [node]
-            # gen = c_generator.CGenerator()
-            # print(gen.visit(cmp))
+            gen = c_generator.CGenerator()
         self.symbol_table.pop()
         return res
     
@@ -263,7 +268,7 @@ class Vectorizer:
         cond = self.visit(node.cond)
         iftrue = self.visit(node.iftrue)
         iffalse = self.visit(node.iffalse)
-        return (cond, iftrue, iffalse)
+        return cond, iftrue, iffalse
 
     def visit_Assignment(self, node):
         op = node.op
@@ -314,7 +319,7 @@ class Vectorizer:
         raise Exception('visitor for "%s" is not implemented' % type(node))
 
     def _is_cf_tuple(self, stmt):
-        return isinstance(stmt, tuple) and len(stmt) == 2 and all(isinstance(cf, Closed_form) for cf in stmt)
+        return isinstance(stmt, tuple) and len(stmt) == 2 and isinstance(stmt[0], Closed_form) and isinstance(stmt[1], list)
 
     def _is_simple_assignment(self, st):
         return isinstance(st, tuple) and is_const(st[1])
@@ -406,7 +411,8 @@ def flat_body_compound(body):
 
 
 if __name__ == '__main__':
-    test_file = 'test/tsc2.c'
+    # test_file = 'test/tsc2.c'
+    test_file = 'test/test8.c'
     # test_file = './tsvc_original.c'
     # try:
     #     c_ast = parse_file(test_file, use_cpp=True, cpp_path='clang-cpp-10', cpp_args='-I./fake_libc_include')
